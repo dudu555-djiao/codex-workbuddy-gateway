@@ -1,0 +1,522 @@
+{
+  "project": "codex-workbuddy-gateway",
+  "version": "0.4.1",
+  "videoAcceptance": "pending_user_verification",
+  "files": [
+    {
+      "path": ".env.example",
+      "bytes": 2059,
+      "sha256": "0d77691198ff976555f3adfde5f5873ade25fbb919082a5f8979455cddc4bb42"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 133,
+      "sha256": "a52dc74de683341edcb152cdc089f2d5913bb04ee47b65a486d4469ad1f4348b"
+    },
+    {
+      "path": "README.md",
+      "bytes": 12764,
+      "sha256": "4a761f58d85cf254fe5378ed76eda35bcdcb8bf760982bda82662a12e700c44b"
+    },
+    {
+      "path": "bin/workbuddy-cli",
+      "bytes": 386,
+      "sha256": "4ea1c38d0027554087d87ef686597f567265e84033d7bb02e6160ebc708f9f38"
+    },
+    {
+      "path": "bin/workbuddy-doctor",
+      "bytes": 425,
+      "sha256": "0e7ba6393a4719a18fbae314df483f9e0f63a14ff83ce141fd0069b07680d64c"
+    },
+    {
+      "path": "bin/workbuddy-gateway",
+      "bytes": 239,
+      "sha256": "737df9b3992b99a3a4768b3fdaaf58f234091049a7d106acbf072d84b939d839"
+    },
+    {
+      "path": "bin/workbuddy-service",
+      "bytes": 217,
+      "sha256": "4ba8a1603ca2c5b62797f1021cc82992156aff8a23e7b8fb0ed30b08c1af04e0"
+    },
+    {
+      "path": "bin/workbuddy-worker",
+      "bytes": 224,
+      "sha256": "2e3e5d55de2abdbc60a6edf23cb57ed1db8d2fb821fde7d258af7ca194927f73"
+    },
+    {
+      "path": "dist/acp-live.js",
+      "bytes": 24461,
+      "sha256": "c128ad79be48281a220cfccde64625b44387d38f5b4a0e3728cdfd701033bfa5"
+    },
+    {
+      "path": "dist/acp-live.js.map",
+      "bytes": 22196,
+      "sha256": "aaf9f22086fa5e368317b1ea07fc21b4fef57eafceeb8e5bfa884205d25599cb"
+    },
+    {
+      "path": "dist/auth.js",
+      "bytes": 2777,
+      "sha256": "2ad2e8c4ebf6e59182bf06c9e6572ba55dc9394dd9df7ea6f0390fae978a5669"
+    },
+    {
+      "path": "dist/auth.js.map",
+      "bytes": 3010,
+      "sha256": "046f74c5c9dcde164c328f44449c081a7075b67bc10c9598eeee339063457feb"
+    },
+    {
+      "path": "dist/brief-result.js",
+      "bytes": 4899,
+      "sha256": "4d1681f9a21af4857770ddf4cb666301800d2439e8c2f25535aabf181270c97a"
+    },
+    {
+      "path": "dist/brief-result.js.map",
+      "bytes": 5329,
+      "sha256": "fa1d0b2f8073fe13e5603756de39428a2e18ee848fb2e8273da9285080884a4b"
+    },
+    {
+      "path": "dist/config.js",
+      "bytes": 3290,
+      "sha256": "3219790ea13fa8add309ce4278e24402825c6df6e9340772757618896df03c0f"
+    },
+    {
+      "path": "dist/config.js.map",
+      "bytes": 2570,
+      "sha256": "dbd6282b4a527a0b9c0d2491fda16d87c0d1f0d1c74e7d2e005dedddc2b63f0f"
+    },
+    {
+      "path": "dist/coordinator.js",
+      "bytes": 12860,
+      "sha256": "d90317a04d3b16d65fcc4f37eb4d1069c7484b8e0731c07ade6c409d14bbb640"
+    },
+    {
+      "path": "dist/coordinator.js.map",
+      "bytes": 11597,
+      "sha256": "c427f3584be30aab0943b6f8a37f81fb81405fbd5704d736eb86647a7dacbe1a"
+    },
+    {
+      "path": "dist/desktop-queue.js",
+      "bytes": 17584,
+      "sha256": "502aa0f4585ae0125b9e80539ffa953e633988f5ef69246c5e6e9df4c1d43f8d"
+    },
+    {
+      "path": "dist/desktop-queue.js.map",
+      "bytes": 14386,
+      "sha256": "9300e18d547370f3f8848fc1be9cd771e97b82dce0954840559bc669f9732860"
+    },
+    {
+      "path": "dist/desktop-runtime.js",
+      "bytes": 2260,
+      "sha256": "d12e670c7165f62860abc9daa14abb32d006a71016edb7fdbf786f1c7c302124"
+    },
+    {
+      "path": "dist/desktop-runtime.js.map",
+      "bytes": 2339,
+      "sha256": "3fb075ab6fb9eef849098b6ee9e8e6a240f68211bec20c7522d920e332133e4f"
+    },
+    {
+      "path": "dist/desktop-worker-cli.js",
+      "bytes": 2358,
+      "sha256": "98e29828631c7318c96f3baf2bb04697a06d9c2c92fa54ccf64ba8e6e5132efe"
+    },
+    {
+      "path": "dist/desktop-worker-cli.js.map",
+      "bytes": 2642,
+      "sha256": "e7353c48b666f4f99b3b3efd93693417c02b0effe84acc1dc32aecfb74610352"
+    },
+    {
+      "path": "dist/doctor.js",
+      "bytes": 2936,
+      "sha256": "ee8dcc596fa63f17d47ac4cf7abd0492f34a1665b647677623f452991e5d0ddc"
+    },
+    {
+      "path": "dist/doctor.js.map",
+      "bytes": 2340,
+      "sha256": "a1539e660d367fc0a072875c3dfd14667f6563088882a034d6b0d828d51d5ba9"
+    },
+    {
+      "path": "dist/native-desktop-trigger.js",
+      "bytes": 16534,
+      "sha256": "317b0cb07a460ba90e7c411237357643ed1954aacec0d406e0c53c77256a1bb4"
+    },
+    {
+      "path": "dist/native-desktop-trigger.js.map",
+      "bytes": 11017,
+      "sha256": "210b89be5925af4aebb11c6e57dec96ee7e1d253c5e0357bab63f7ea4dc0412d"
+    },
+    {
+      "path": "dist/persistent-service.js",
+      "bytes": 13159,
+      "sha256": "8adfa44b0501f04df64811cf1c5e368b8d5e566b867842697b72926f85fb25e8"
+    },
+    {
+      "path": "dist/persistent-service.js.map",
+      "bytes": 13028,
+      "sha256": "ad7144f72fee78053e3219ebba22987fbb94ac69722f9612ff4ef3955adda40e"
+    },
+    {
+      "path": "dist/run-journal.js",
+      "bytes": 9551,
+      "sha256": "a574c5fde90b8a347008af23da2249fefe744c4a9863f30bd4357bbec3cc692b"
+    },
+    {
+      "path": "dist/run-journal.js.map",
+      "bytes": 9882,
+      "sha256": "43263dfaf034113047fe497c58cd404b7f944f0d4f76abe6e40eb3421bb44707"
+    },
+    {
+      "path": "dist/run-worker.js",
+      "bytes": 11975,
+      "sha256": "33e3258052db114a577f50e3179fdba3141ce3b5148a7b93a75e2a710c4864e0"
+    },
+    {
+      "path": "dist/run-worker.js.map",
+      "bytes": 10822,
+      "sha256": "35b2b8ea21d8746e2b7036f798e153bc132c08af79502592a32cc3a2f4f85f36"
+    },
+    {
+      "path": "dist/server.js",
+      "bytes": 11457,
+      "sha256": "670fd29480cdfbd87fc6086c584c3f3c2beed721cb9ce8072800eab6a4ab67ac"
+    },
+    {
+      "path": "dist/server.js.map",
+      "bytes": 10825,
+      "sha256": "175f58aa2d165d15087fc0b2371db84459e5e9f59b23245d1e93dd1a85ca8ad4"
+    },
+    {
+      "path": "dist/service-cli.js",
+      "bytes": 13948,
+      "sha256": "85991599d511d118a757c34094a61eed06ed0ddf8a98c92fd21b408490d668c9"
+    },
+    {
+      "path": "dist/service-cli.js.map",
+      "bytes": 13918,
+      "sha256": "bb08abd6499da3183f02bbe2772fc5c4077b1a17e6e7150931f89957d00328e8"
+    },
+    {
+      "path": "dist/src/auth.js",
+      "bytes": 2777,
+      "sha256": "2ad2e8c4ebf6e59182bf06c9e6572ba55dc9394dd9df7ea6f0390fae978a5669"
+    },
+    {
+      "path": "dist/src/auth.js.map",
+      "bytes": 3013,
+      "sha256": "f1fd3abbdc97a58519a09f1c9b74b2b41dce107f0cd1b9901314974ae653aa6a"
+    },
+    {
+      "path": "dist/src/config.js",
+      "bytes": 1554,
+      "sha256": "87291ba56a569daa9b2ce5b5be52a0836b7fa5c25669f7adc6f7046f62f0ea56"
+    },
+    {
+      "path": "dist/src/config.js.map",
+      "bytes": 1382,
+      "sha256": "ab45e96ddec256f1bb432a86b848427c12c040e6388144a8642daf8634b20a51"
+    },
+    {
+      "path": "dist/src/server.js",
+      "bytes": 9017,
+      "sha256": "252ff02f556093ba0e3baac39a6e3adea30ccf7160758b48682ef314d2ec23ff"
+    },
+    {
+      "path": "dist/src/server.js.map",
+      "bytes": 9252,
+      "sha256": "42f0776262e96a2b13a98d9285aab595cd827e9766a9b17dfc19422666e9d5a3"
+    },
+    {
+      "path": "dist/src/task-store.js",
+      "bytes": 4176,
+      "sha256": "26fca80c0d1d39ae0e4faa372ffce3d13f781063da63fd9932b66c2a97e529a7"
+    },
+    {
+      "path": "dist/src/task-store.js.map",
+      "bytes": 3860,
+      "sha256": "bb653de9d538218c471bade7c685b1d20739d54d84b4b3f71d87e62e4e467d4d"
+    },
+    {
+      "path": "dist/src/token-store.js",
+      "bytes": 1081,
+      "sha256": "f88cae4d5be5a0bddeee4bd03a884d72d9b3874e65e50958cf955fbc36d9104c"
+    },
+    {
+      "path": "dist/src/token-store.js.map",
+      "bytes": 1299,
+      "sha256": "12fc5baed7356b5e80ed5cd6e6c06fafd990dbfda39d752158e900f232d32471"
+    },
+    {
+      "path": "dist/src/workbuddy-client.js",
+      "bytes": 6336,
+      "sha256": "cbe341d93f1008d99e9c4f1913512eef95cda9a3d4593080070118139f8b8fab"
+    },
+    {
+      "path": "dist/src/workbuddy-client.js.map",
+      "bytes": 6171,
+      "sha256": "da0873777950649da69c77dd20e31b8cc363d8544393708d8acd6d4b3ccb8f8e"
+    },
+    {
+      "path": "dist/task-store.js",
+      "bytes": 14887,
+      "sha256": "ded0973868a4b0fc545698b7c0b3e077ba06f3a14a8f47c5e088d07157ed9de5"
+    },
+    {
+      "path": "dist/task-store.js.map",
+      "bytes": 12292,
+      "sha256": "a25d15e56d776531864bfe37f524f04dcdec4c7559c4c79a0230b2c4b5f55fdb"
+    },
+    {
+      "path": "dist/test/task-store.test.js",
+      "bytes": 1347,
+      "sha256": "9967205d2472afa2e2aa9112cc5143d7ed92b7228acd66d68e1e7b638b1451b6"
+    },
+    {
+      "path": "dist/test/task-store.test.js.map",
+      "bytes": 1763,
+      "sha256": "c7c22caf6d0fb6763b7cdacb269d211471fd1f110f8810c9267bf27661b96c6e"
+    },
+    {
+      "path": "dist/test/workbuddy-client.test.js",
+      "bytes": 2535,
+      "sha256": "3c570ece0b0c4ea863860821b481e991d4e3b8837269d534799e9f55b5369bb6"
+    },
+    {
+      "path": "dist/test/workbuddy-client.test.js.map",
+      "bytes": 2898,
+      "sha256": "db3b2a7be285cf54f69bc917bcfb2d04923a34b04e09736f7f4a3d8ee8f443cf"
+    },
+    {
+      "path": "dist/token-store.js",
+      "bytes": 1081,
+      "sha256": "f88cae4d5be5a0bddeee4bd03a884d72d9b3874e65e50958cf955fbc36d9104c"
+    },
+    {
+      "path": "dist/token-store.js.map",
+      "bytes": 1296,
+      "sha256": "7292f08c82b14178d6395afe8c1cb0dd2e75c3d75171ff133afdd4ee0f75d058"
+    },
+    {
+      "path": "dist/workbuddy-client.js",
+      "bytes": 21335,
+      "sha256": "8cb9d2d742b971cc8961a8d236d9adbe6c8283ce768e9f9c1f5781a3944d9fb5"
+    },
+    {
+      "path": "dist/workbuddy-client.js.map",
+      "bytes": 21233,
+      "sha256": "7f4ac6ae32a95fadab97626ae1f5817ed1f3ccc825d0d073d58a2e0b91ffffd0"
+    },
+    {
+      "path": "docs/CODEX_WORKFLOW.md",
+      "bytes": 5169,
+      "sha256": "15af1964b5da00bccc98feef83cf697e940413f68be6e67df8468d77b9aea71d"
+    },
+    {
+      "path": "docs/FAILURE_REVIEW.md",
+      "bytes": 5758,
+      "sha256": "773c359c2363476a26338cfb15b510039961d9d1a0bd03d87e1c1f65997bb86e"
+    },
+    {
+      "path": "docs/QUEUE_WORKER.md",
+      "bytes": 9027,
+      "sha256": "10f98aaf75ce7a602fefaeeed76241a0c9de245a3642d3ab203f90f6e5b2c879"
+    },
+    {
+      "path": "docs/USER_ACCEPTANCE.md",
+      "bytes": 4814,
+      "sha256": "99853a2ca0ec7c3a03cebefe487df2d7649e715ff0c4e4ac4e01399a16bc3429"
+    },
+    {
+      "path": "docs/video-explanation.md",
+      "bytes": 1618,
+      "sha256": "9b5f44f3531dad1d06cd566a31c400617fcf4b44ec5b2ab76c0735a939d37e79"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 58937,
+      "sha256": "284b832afb399068ae45ebc35285a3736905e7dd15872492c9fb307dae963f20"
+    },
+    {
+      "path": "package.json",
+      "bytes": 782,
+      "sha256": "2d69b1df5ec44929d9eb8ac496427b07476f9652bfa75bce1254a94849229803"
+    },
+    {
+      "path": "scripts/install-skill.mjs",
+      "bytes": 2616,
+      "sha256": "e3bd5f9cbb91b3b786232967b7dc23cdb4126d4ef04b30499562776b76e51f47"
+    },
+    {
+      "path": "scripts/package.mjs",
+      "bytes": 9019,
+      "sha256": "bf7e26a926e3f935e59ff00e812ecd41c9859218476a1d00d2479368894cc2f9"
+    },
+    {
+      "path": "skills/workbuddy-executor/SKILL.md",
+      "bytes": 8442,
+      "sha256": "38f78e7eee8c25b1d1522b7d19c2c9520bc756df53599144c9e19eb2495fcca4"
+    },
+    {
+      "path": "skills/workbuddy-executor/agents/openai.yaml",
+      "bytes": 430,
+      "sha256": "35bc8aaad9e61b959d169d0609537145d1430c73706e69c41da5e10109688f05"
+    },
+    {
+      "path": "skills/workbuddy-executor/references/setup.md",
+      "bytes": 7167,
+      "sha256": "1b1172f4602b559c79ec9b40473f14cb10a35a24acf66ea9abc5af70bfc0afa8"
+    },
+    {
+      "path": "src/acp-live.ts",
+      "bytes": 24352,
+      "sha256": "3315ba16a21b87022a977e75d88cf552884846282e03bf5ef39698fd8e967ccb"
+    },
+    {
+      "path": "src/auth.ts",
+      "bytes": 2642,
+      "sha256": "c124352da251d849525699a3a23b4a07bb62e395c30fd3024191b260a50d336f"
+    },
+    {
+      "path": "src/brief-result.ts",
+      "bytes": 5239,
+      "sha256": "e59bd5394e3a49b2afad369188c3f7a72967dbbb92fca7925b33a60cce5fe4d5"
+    },
+    {
+      "path": "src/config.ts",
+      "bytes": 3813,
+      "sha256": "f6c33c4a1f24f6ef9c9e80477553054d0159b7aaf913f66ac4294857875be7fe"
+    },
+    {
+      "path": "src/coordinator.ts",
+      "bytes": 12872,
+      "sha256": "fce6fc1895d2ebd5fab0a0cfdd3f7987a7bead265341305ccfff568604ef541c"
+    },
+    {
+      "path": "src/desktop-queue.ts",
+      "bytes": 17554,
+      "sha256": "31e1c742dcc51db59ce148a7bce74fa75b0f26db0652023d629780acb37f7867"
+    },
+    {
+      "path": "src/desktop-runtime.ts",
+      "bytes": 2380,
+      "sha256": "aa88aba2e542ce01c9c009c06504f45c27709e2e5e2ac835bf98baaf9dd9b922"
+    },
+    {
+      "path": "src/desktop-worker-cli.ts",
+      "bytes": 2219,
+      "sha256": "983d2870829440acae88281b135c776eac796b3b558b278a8149d24d7a79b730"
+    },
+    {
+      "path": "src/doctor.ts",
+      "bytes": 2814,
+      "sha256": "f5f3560b481c59a665724e8dc2adf445276af5d6a8a66726bf3d7b28b00617b6"
+    },
+    {
+      "path": "src/native-desktop-trigger.ts",
+      "bytes": 16164,
+      "sha256": "5ceff49b9586ee256afccc82609bac2192e6b713155875bd9bf774c08e881415"
+    },
+    {
+      "path": "src/persistent-service.ts",
+      "bytes": 13992,
+      "sha256": "872955ed119174b86c4dd2018ebd205c07bfccb4784f4908c7fd462b18e82c45"
+    },
+    {
+      "path": "src/run-journal.ts",
+      "bytes": 9932,
+      "sha256": "5668963946d5b2255b439749031e1c6b7d7a34f1336945397424fb079eb0a3fd"
+    },
+    {
+      "path": "src/run-worker.ts",
+      "bytes": 11891,
+      "sha256": "34f52a6ee983eb3357359208c7fc3d1fc84f227ef444450ca5cb5e68f517c37b"
+    },
+    {
+      "path": "src/server.ts",
+      "bytes": 11388,
+      "sha256": "485ab158799bc4b3fb5e4a3585f435c386064db23b92791f7704fe2839582066"
+    },
+    {
+      "path": "src/service-cli.ts",
+      "bytes": 14504,
+      "sha256": "efbebae5a9e7a594bc29a53d90a2d97ce45ccd14321b72ee112a0d831ec5b26b"
+    },
+    {
+      "path": "src/task-store.ts",
+      "bytes": 17236,
+      "sha256": "171fd5de33ff109387708ad245ffa3b2efc1a98a7818390b1b2e4f75c807df12"
+    },
+    {
+      "path": "src/token-store.ts",
+      "bytes": 1203,
+      "sha256": "fd29c8bb74f623bea9f9e4be7cad24a6353807c0c50363ec6037c57ff06e3d11"
+    },
+    {
+      "path": "src/workbuddy-client.ts",
+      "bytes": 22815,
+      "sha256": "9a8e8df1a2b5908449faf4ca300899b957b00daea4af71bee9780c94eb232195"
+    },
+    {
+      "path": "test/acp-live.test.ts",
+      "bytes": 20237,
+      "sha256": "1c913256d763d1232b82bc2611a6379b6ceb486a38470a2e5da3f5928acf9b02"
+    },
+    {
+      "path": "test/brief-result.test.ts",
+      "bytes": 12732,
+      "sha256": "8d91b9f9025789215adb1cf887300de0e460bd128816d4117fdb0b5963c57332"
+    },
+    {
+      "path": "test/coordinator.test.ts",
+      "bytes": 13929,
+      "sha256": "f134fe9d511dbf6bc6345c8f1473ef3cdab7f173e470f8c1b02f31773f46d7df"
+    },
+    {
+      "path": "test/desktop-queue.test.ts",
+      "bytes": 7556,
+      "sha256": "df015d4065b569ae908e0c1ef83dbbd2ebaee04bc35e5d90f7f45fc45a300d1e"
+    },
+    {
+      "path": "test/launcher.test.ts",
+      "bytes": 2379,
+      "sha256": "111e48c19d4f4da3ad26b18aafa2d8f515f768ff3488a8127f7cbfaf4ae511c1"
+    },
+    {
+      "path": "test/native-desktop-trigger.test.ts",
+      "bytes": 19311,
+      "sha256": "23abc54860490cf95470a992c68ab45451603005a000fb30f581a98fa94d9bba"
+    },
+    {
+      "path": "test/package.test.ts",
+      "bytes": 8418,
+      "sha256": "ff7c2da20cb62b184be769c123ad0bfb58c151db8da034403ddf9e54c5e535d4"
+    },
+    {
+      "path": "test/persistent-service.test.ts",
+      "bytes": 17333,
+      "sha256": "9bdcb2791e3c15e9b9e50c5d436516c22879872d8b366573bc7691d24389353f"
+    },
+    {
+      "path": "test/run-journal.test.ts",
+      "bytes": 8635,
+      "sha256": "51d5e64871968adee3bdaf8b246a71e501d08f8284d018cd51de54b1253913fd"
+    },
+    {
+      "path": "test/run-worker.test.ts",
+      "bytes": 9153,
+      "sha256": "46c93295397e6a2c7022bea97cf5842b4b3a3317c4d2135c640108cf398aa87c"
+    },
+    {
+      "path": "test/task-store.test.ts",
+      "bytes": 11919,
+      "sha256": "36b9c167556b39ee205bff4cdc45a24043ffcd186ccd241ccb6d3f21737c7fea"
+    },
+    {
+      "path": "test/workbuddy-client.test.ts",
+      "bytes": 2573,
+      "sha256": "bc643a64aa77fe1e345ce8a8a74d63ee072ba61bd4ef8592af0791e973d64f8f"
+    },
+    {
+      "path": "tsconfig.json",
+      "bytes": 356,
+      "sha256": "ac3756b65baba6689a9c2568e5eae83ff7053c4164ae0283529b37adb39c0756"
+    }
+  ]
+}

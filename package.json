@@ -1,0 +1,29 @@
+{
+  "name": "codex-workbuddy-gateway",
+  "version": "0.4.1",
+  "private": true,
+  "description": "Local MCP bridge for supervised tasks in verified WorkBuddy desktop conversations.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "auth": "node dist/auth.js",
+    "dev": "tsx src/server.ts",
+    "test": "tsx --test test/**/*.test.ts",
+    "doctor": "node dist/doctor.js",
+    "package": "node scripts/package.mjs",
+    "skill:install": "node scripts/install-skill.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.21.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

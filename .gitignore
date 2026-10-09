@@ -1,0 +1,16 @@
+node_modules/
+dist/
+data/
+work/
+.env
+.env.*
+!.env.example
+outputs/
+logs/
+*.log
+*.sqlite
+*.sqlite-*
+*.tar.gz
+*.zip
+*.sha256
+.DS_Store

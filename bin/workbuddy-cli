@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$ROOT"
+ELECTRON_BIN=${WORKBUDDY_CLI_ELECTRON:-/Applications/WorkBuddy.app/Contents/MacOS/Electron}
+CLI_SCRIPT=${WORKBUDDY_CLI_SCRIPT:-/Applications/WorkBuddy.app/Contents/Resources/app.asar/cli/bin/codebuddy}
+exec env ELECTRON_RUN_AS_NODE=1 CODEBUDDY_FORCE_HEADLESS_BUNDLE=1 "$ELECTRON_BIN" "$CLI_SCRIPT" "$@"

@@ -1,0 +1,18 @@
+#!/bin/sh
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$ROOT"
+if [ -f "$ROOT/.env" ]; then
+  set -a
+  # This is the local project configuration; never source downloaded .env files.
+  # shellcheck disable=SC1091
+  . "$ROOT/.env"
+  set +a
+fi
+
+if [ ! -f "$ROOT/dist/doctor.js" ]; then
+  echo 'Build the project first: npm run build' >&2
+  exit 1
+fi
+exec "${WORKBUDDY_NODE_BIN:-node}" "$ROOT/dist/doctor.js"

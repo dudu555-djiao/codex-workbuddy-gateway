@@ -1,0 +1,9 @@
+interface:
+  display_name: "WorkBuddy 执行官"
+  short_description: "让桌面 WorkBuddy 执行任务，Codex 精简派工、必要抽查与同会话返工"
+  default_prompt: "使用 $workbuddy-executor，让桌面 WorkBuddy 执行我的任务，Codex 只做精简派工和必要验收。"
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "workbuddy"
+      description: "已在本机注册的 WorkBuddy Desktop Bridge MCP"
