@@ -8,7 +8,8 @@ import { loadConfig, type Config } from "./config.js";
 import { TaskStore } from "./task-store.js";
 import { readDesktopSession } from "./desktop-runtime.js";
 import { runsDirectory, writePrivateJson } from "./run-journal.js";
-import { PersistentDesktopService, readServiceRegistration, registeredServiceConfig, serviceRegistrationPath, validateServiceRegistration, type NativeDesktopTrigger, type ServiceRegistration } from "./persistent-service.js";
+import { pumpWorkspaceWorkers, recoverExpiredAttempt, readServiceRegistration, registeredServiceConfig, serviceRegistrationPath, validateServiceRegistration, type NativeDesktopTrigger, type ServiceRegistration } from "./persistent-service.js";
+import { WorkspaceWorkers, readWorkspaceWorkers } from "./workspace-workers.js";
 
 const DEBUG_ENV = "WORKBUDDY_REMOTE_DEBUGGING_PORT";
 interface CommandResult { status: number; stdout: string; stderr?: string }
@@ -122,7 +123,8 @@ export function serviceStatus(configFile: string, run: LaunchctlRunner = launchc
   let state: unknown;
   try { state = JSON.parse(fs.readFileSync(stateFile, "utf8")); } catch { state = undefined; }
   const status = registration.launchdLabel && uid !== undefined ? run(["print", `gui/${uid}/${registration.launchdLabel}`]) : undefined;
-  return { ok: true, installed: Boolean(registration.launchdLabel && registration.plistPath && fs.existsSync(registration.plistPath)), launchdLoaded: status?.status === 0, configFile, sessionId: registration.sessionId, workspace: registration.workspace, cdpPort: registration.cdpPort, desktopRegistered: native.registered, state };
+  const workers=readWorkspaceWorkers(registeredServiceConfig(loadConfig(),registration),registration).map(worker=>({...worker,desktopRegistered:readDesktopSession(registration.workbuddyConfigDir,worker.sessionId).registered}));
+  return { ok: true, installed: Boolean(registration.launchdLabel && registration.plistPath && fs.existsSync(registration.plistPath)), launchdLoaded: status?.status === 0, configFile, sessionId: registration.sessionId, workspace: registration.workspace, cdpPort: registration.cdpPort, desktopRegistered: workers.some(worker=>worker.state==='ready'&&worker.desktopRegistered), defaultDesktopRegistered:native.registered, workers, state };
 }
 
 export function uninstallService(configFile: string, run: LaunchctlRunner = launchctl, uid = process.getuid?.()): Record<string, unknown> {
@@ -156,7 +158,6 @@ async function runService(configFile: string): Promise<void> {
   if (typeof module.createNativeDesktopTrigger !== "function") throw new Error("The native desktop trigger factory is unavailable; rebuild the complete project");
   const trigger = await module.createNativeDesktopTrigger(config, { cdpPort: registration.cdpPort });
   const store = new TaskStore(config.dbFile);
-  const service = new PersistentDesktopService(config, registration, trigger, store);
   const stateFile = path.join(registration.projectDir, "data", "persistent-service-status.json");
   let stopping = false;
   let stopDelay: (() => void) | undefined;
@@ -165,7 +166,7 @@ async function runService(configFile: string): Promise<void> {
   process.once("SIGINT", stop);
   try {
     while (!stopping) {
-      const result = await service.pump();
+      const result = await pumpWorkspaceWorkers(config, registration, trigger, store);
       writePrivateJson(stateFile, { pid: process.pid, ...result, updatedAt: new Date().toISOString() });
       if (!stopping) await new Promise<void>((resolve) => {
         const timer = setTimeout(() => { stopDelay = undefined; resolve(); }, registration.intervalMs ?? 1500);
@@ -184,6 +185,7 @@ async function runService(configFile: string): Promise<void> {
 async function main(): Promise<void> {
   const parsed = parseArgs({ allowPositionals: true, options: {
     config: { type: "string" }, "session-id": { type: "string" }, workspace: { type: "string" }, "project-dir": { type: "string" }, "node-bin": { type: "string" }, "cdp-port": { type: "string" }, "interval-ms": { type: "string" },
+    "task-id": { type: "string" }, "attempt-id": { type: "string" }, reason: { type: "string" },
   } });
   const [action] = parsed.positionals;
   const projectDir = path.resolve(parsed.values["project-dir"] ?? path.dirname(path.dirname(fileURLToPath(import.meta.url))));
@@ -196,7 +198,24 @@ async function main(): Promise<void> {
   } else if (action === "status") result = serviceStatus(configFile);
   else if (action === "uninstall") result = uninstallService(configFile);
   else if (action === "run") { await runService(configFile); return; }
-  else throw new Error("Use install --session-id ID --workspace PATH [--cdp-port PORT], status, uninstall, or run");
+  else if (action === "recover") {
+    const registration = readServiceRegistration(configFile);
+    if (!registration) throw new Error("Persistent service registration is missing");
+    const taskId = parsed.values["task-id"], attemptId = parsed.values["attempt-id"], reason = parsed.values.reason;
+    if (!taskId || !attemptId || !reason) throw new Error("recover requires --task-id, --attempt-id and --reason after inspecting the native failure");
+    const config = registeredServiceConfig(loadConfig(), registration);
+    const { NativeDesktopRpcTrigger } = await import("./native-desktop-trigger.js");
+    // Recovery must not restart the app or change native session state to obtain proof.
+    const trigger = new NativeDesktopRpcTrigger(config, registration.cdpPort, false);
+    const store=new TaskStore(config.dbFile);
+    const sessionId=store.get(taskId)?.sessionId;
+    store.close();
+    const worker=readWorkspaceWorkers(config,registration).find(worker=>worker.sessionId===sessionId);
+    if(!worker)throw new Error("The task's native worker is not enrolled in this service");
+    try { result = await recoverExpiredAttempt(config, {...registration,sessionId:worker.sessionId,workspace:worker.workspace}, trigger, { taskId, attemptId, reason }); }
+    finally { trigger.close(); }
+  }
+  else throw new Error("Use install --session-id ID --workspace PATH [--cdp-port PORT], status, uninstall, run, or recover --task-id ID --attempt-id ID --reason TEXT");
   console.log(JSON.stringify(result));
 }
 

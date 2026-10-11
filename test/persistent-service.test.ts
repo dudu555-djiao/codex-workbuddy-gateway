@@ -10,7 +10,7 @@ import { TaskCoordinator } from "../src/coordinator.js";
 import { WorkBuddyClient } from "../src/workbuddy-client.js";
 import { DesktopQueue } from "../src/desktop-queue.js";
 import { RunJournal, writePrivateJson } from "../src/run-journal.js";
-import { PersistentDesktopService, readServiceRegistration, serviceRegistrationPath, type NativeDesktopTrigger, type ServiceRegistration, type WakeIntent } from "../src/persistent-service.js";
+import { PersistentDesktopService, recoverExpiredAttempt, readServiceRegistration, serviceRegistrationPath, type NativeDesktopTrigger, type ServiceRegistration, type WakeIntent } from "../src/persistent-service.js";
 import { installService, launchdPlist, serviceStatus, uninstallService, type LaunchctlRunner } from "../src/service-cli.js";
 
 class FakeTrigger implements NativeDesktopTrigger {
@@ -51,6 +51,82 @@ function fixture(t: { after: (fn: () => void) => void }) {
   t.after(() => { store.close(); fs.rmSync(dir, { recursive: true, force: true }); });
   return { dir, config, store, coordinator, queue, registration, trigger, service, send };
 }
+
+async function expiredClaim(f: ReturnType<typeof fixture>) {
+  const journal = await f.send();
+  const claim = await f.queue.claim(f.registration.sessionId, 0);
+  if (claim.status !== "task") throw new Error("Expected native fixture claim");
+  journal.save({ ...journal.snapshot()!, deadline: new Date(Date.now() - 1000).toISOString() });
+  assert.equal((await f.coordinator.sync(claim.taskId)).state, "blocked");
+  return { journal, claim, input: { taskId: claim.taskId, attemptId: claim.attemptId, reason: "Inspected native aborted network turn and existing partial output" } };
+}
+
+test("explicit idle recovery preserves failure and artifacts; only a new same-task native attempt can report", async (t) => {
+  const f = fixture(t);
+  const { journal, claim, input } = await expiredClaim(f);
+  const artifact = path.join(f.dir, "partial.json");
+  fs.writeFileSync(artifact, '{"clips":[1,2]}');
+  const failure = journal.snapshot()!.error;
+  await assert.rejects(() => f.coordinator.continue({ taskId: claim.taskId, feedback: "Resume" }), /not been confirmed stopped/);
+  const result = await recoverExpiredAttempt(f.config, f.registration, f.trigger, input);
+  assert.equal(result.taskCompleted, false);
+  assert.equal(journal.snapshot()!.status, "blocked");
+  assert.equal(journal.snapshot()!.stopReason, "native_idle_verified");
+  assert.equal(journal.snapshot()!.error, failure);
+  assert.equal(fs.readFileSync(artifact, "utf8"), '{"clips":[1,2]}');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(journal.dir, "recovery.json"), "utf8")).taskCompleted, false);
+  assert.equal((await recoverExpiredAttempt(f.config, f.registration, f.trigger, input)).alreadyRecovered, true);
+  assert.throws(() => f.queue.report({ ...claim, status: "completed", text: "Late result", artifacts: [artifact] }), /no longer active/);
+  await f.coordinator.continue({ taskId: claim.taskId, feedback: "Validate existing partial.json and report through this new lease" });
+  const resumed = await f.queue.claim(f.registration.sessionId, 0);
+  if (resumed.status !== "task") throw new Error("Expected resumed native claim");
+  assert.notEqual(resumed.attemptId, claim.attemptId);
+  assert.equal(resumed.taskId, claim.taskId);
+  assert.equal(resumed.sessionId, claim.sessionId);
+  f.queue.report({ ...resumed, status: "completed", text: "TASK_STATUS: completed\nTEST_RESULT: revalidated existing partial", artifacts: [artifact] });
+  assert.equal((await f.coordinator.sync(claim.taskId)).state, "needs_review");
+});
+
+test("recovery refuses busy, waiting-input, offline or changed native workspace", async (t) => {
+  const f = fixture(t);
+  const { journal, input } = await expiredClaim(f);
+  for (const state of ["busy", "waiting_input", "offline"] as const) {
+    f.trigger.state = state;
+    await assert.rejects(() => recoverExpiredAttempt(f.config, f.registration, f.trigger, input), /verified idle/);
+  }
+  f.trigger.state = "idle";
+  f.trigger.workspace = path.join(f.dir, "another-project");
+  await assert.rejects(() => recoverExpiredAttempt(f.config, f.registration, f.trigger, input), /verified idle/);
+  assert.equal(journal.snapshot()!.stopReason, undefined);
+});
+
+test("recovery refuses current working or unexpired attempts and stale attempt identities", async (t) => {
+  const f = fixture(t);
+  const { journal, input } = await expiredClaim(f);
+  await assert.rejects(() => recoverExpiredAttempt(f.config, f.registration, f.trigger, { ...input, attemptId: RunJournal.newId() }));
+  journal.save({ ...journal.snapshot()!, status: "working" });
+  await assert.rejects(() => recoverExpiredAttempt(f.config, f.registration, f.trigger, input), /blocked/);
+  journal.save({ ...journal.snapshot()!, status: "blocked", deadline: new Date(Date.now() + 60_000).toISOString() });
+  await assert.rejects(() => recoverExpiredAttempt(f.config, f.registration, f.trigger, input), /expired/);
+  assert.equal(journal.snapshot()!.stopReason, undefined);
+});
+
+test("native inspection holds the pump lock so recovery cannot overlap an automatic wake", async (t) => {
+  const f = fixture(t);
+  const { input } = await expiredClaim(f);
+  await f.send("queued-next");
+  let release!: () => void;
+  let entered!: () => void;
+  const inspecting = new Promise<void>(resolve => { entered = resolve; });
+  const released = new Promise<void>(resolve => { release = resolve; });
+  f.trigger.inspect = async () => { entered(); await released; return { state: "idle", workspace: f.dir }; };
+  const recovery = recoverExpiredAttempt(f.config, f.registration, f.trigger, input);
+  await inspecting;
+  assert.equal((await f.service().pump()).status, "session_busy");
+  assert.equal(f.trigger.wakes.length, 0);
+  release();
+  assert.equal((await recovery).taskCompleted, false);
+});
 
 test("wake intent is durable before native submission, and daemon restart never submits accepted wake twice", async (t) => {
   const f = fixture(t);

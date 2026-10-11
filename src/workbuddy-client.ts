@@ -132,7 +132,8 @@ export class WorkBuddyClient {
       void this.gatewayFetch(`/api/v1/runs/${encodeURIComponent(run.runId)}/cancel`, { method: "POST" }).catch(() => undefined);
       return true;
     }
-    if (this.config.backend === "desktop-acp" || this.config.backend === "desktop-queue") return this.durableRuns.cancel(messageId);
+    if (this.config.backend === "desktop-queue") return this.desktopQueue.requestCancellation(messageId);
+    if (this.config.backend === "desktop-acp") return this.durableRuns.cancel(messageId);
     const run = this.cliRuns.get(messageId);
     if (!run || run.closed) return false;
     run.child.kill("SIGTERM");

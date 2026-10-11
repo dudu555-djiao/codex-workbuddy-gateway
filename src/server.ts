@@ -12,12 +12,13 @@ import { resultForDetail, type ResultDetail, type BriefResultOptions } from "./b
 import { serviceStatus } from "./service-cli.js";
 import { readServiceRegistration } from "./persistent-service.js";
 import path from "node:path";
+import { ensureWorkspace, listWorkspaces } from "./workspace-manager.js";
 
 const config = loadConfig();
 const client = new WorkBuddyClient(config);
 const store = new TaskStore(config.dbFile);
 const coordinator = new TaskCoordinator(config, store, client);
-const server = new McpServer({ name: "codex-workbuddy-gateway", version: "0.4.1" });
+const server = new McpServer({ name: "codex-workbuddy-gateway", version: "0.7.0" });
 const timeout = z.number().int().positive().max(86_400).optional();
 const taskId = z.string().min(1).max(200);
 const detail = z.enum(["full", "brief"]).optional().default("full").describe("full preserves complete records. brief omits repeated goals/history/logs and clips the latest report to 2000 characters, while retaining identity, blockers and artifact paths. Brief summaries are not acceptance evidence.");
@@ -31,19 +32,25 @@ server.tool("workbuddy_health", "Probe the configured transport. Online means a 
   if (config.backend === "desktop-queue") sessions = new DesktopQueue(config).listeners();
   const registrationFile=config.serviceConfigFile??path.join(path.dirname(config.dbFile),"persistent-service.json");
   const registration=config.backend==="desktop-queue"?readServiceRegistration(registrationFile):undefined;
-  const bound=registration&&path.resolve(registration.dbFile)===path.resolve(config.dbFile)&&(!sessionId||sessionId===registration.sessionId);
+  const bound=registration&&path.resolve(registration.dbFile)===path.resolve(config.dbFile)&&(!sessionId||listWorkspaces(config).some(worker=>worker.sessionId===sessionId));
   const persistentService=config.backend==="desktop-queue"?(bound?serviceStatus(registrationFile):{installed:false}):undefined;
   const state=persistentService?.state as {updatedAt?:string;status?:string}|undefined;
   const serviceAvailable=Boolean(persistentService?.installed&&persistentService.launchdLoaded&&persistentService.desktopRegistered&&state?.updatedAt&&Date.now()-Date.parse(state.updatedAt)<30_000);
-  return { ok: true, backend: config.backend, online: result.online, desktopSupervision: ["desktop-acp", "desktop-queue"].includes(config.backend), ready: result.ready ?? false, sessionId: result.sessionId??persistentService?.sessionId, sessions, persistentService, workerCandidates: config.backend === "desktop-queue"&&!bound ? listDesktopSessions(config.workbuddyConfigDir) : undefined, status: result.online ? "transport_online" : serviceAvailable?(state?.status==="no_task"?"persistent_service_idle":"persistent_service_state"):"offline", message: serviceAvailable&&!result.online?(state?.status==="no_task"?"The persistent service is running. No temporary listener is needed while idle; queued tasks wake the bound native WorkBuddy chat automatically.":"The persistent service is running; inspect its state for active work, blockers or uncertain submission before any retry."):result.raw.msg, next: persistentService?.installed?"Persistent service can wake the registered native chat on queued tasks. An idle chat has no claim listener; inspect service state separately. Queued/installed does not prove execution.":"Use a dedicated desktop WorkBuddy worker conversation. Generate persistent setup with prepare_worker(persistent:true), or manually start the temporary claim helper. Candidate history entries are not active listeners." };
+  return { ok: true, backend: config.backend, online: result.online, desktopSupervision: ["desktop-acp", "desktop-queue"].includes(config.backend), ready: result.ready ?? false, sessionId: result.sessionId??sessionId??persistentService?.sessionId, sessions, persistentService, workerCandidates: config.backend === "desktop-queue"&&!bound ? listDesktopSessions(config.workbuddyConfigDir) : undefined, status: result.online ? "transport_online" : serviceAvailable?(state?.status==="no_task"?"persistent_service_idle":"persistent_service_state"):"offline", message: serviceAvailable&&!result.online?(state?.status==="no_task"?"The persistent service is running. No temporary listener is needed while idle; queued tasks wake enrolled native WorkBuddy chats automatically.":"The persistent service is running; inspect its per-workspace state for active work, blockers or uncertain submission before any retry."):result.raw.msg, next: persistentService?.installed?"Pass workspace to send_task to create/reuse its native worker and route automatically. Queued/installed does not prove execution.":"Call ensure_workspace with an existing absolute project directory for native setup without manual chat creation. Login and native permissions remain in WorkBuddy." };
 }, detail));
+
+server.tool("workbuddy_ensure_workspace", "Create or reuse a dedicated native WorkBuddy session for a project directory without Computer Use or manual chat setup. Optional sessionId selects an existing real session in the same directory. Other projects and queued tasks retain their bindings.", {
+  workspace:z.string().min(1).describe("Existing absolute project directory"),sessionId:z.string().min(1).optional(),title:z.string().min(1).max(200).optional(),detail,
+}, ({detail,...input})=>guard(()=>ensureWorkspace(config,input),detail));
+
+server.tool("workbuddy_list_workspaces", "List registered project directories, selected execution sessions and native registration status. An installed worker does not prove task success.", {detail}, ({detail})=>guard(async()=>({ok:true,workers:listWorkspaces(config)}),detail));
 
 server.tool("workbuddy_prepare_worker", "Generate instructions for the selected real desktop chat. persistent:true installs a one-time native auto-wake service; false starts a temporary listener. Read-only: generating a prompt does not install or start anything.", { sessionId: z.string().min(1), persistent: z.boolean().optional().default(false) }, ({ sessionId, persistent }) => guard(async () => ({ ok: true, ...new DesktopQueue(config).prepare(sessionId, persistent) })));
 
 server.tool("workbuddy_send_task", "Reserve and dispatch a task to a verified WorkBuddy desktop conversation. Repeated taskId never dispatches twice. Keep polling with workbuddy_wait, independently inspect the result, then continue or accept.", {
-  taskId: taskId.optional(), objective: z.string().min(1), workspace: z.string().optional().describe("Existing absolute directory; must match the desktop session's working directory."),
+  taskId: taskId.optional(), objective: z.string().min(1), workspace: z.string().optional().describe("Existing absolute project directory; automatically create or reuse its native WorkBuddy worker when sessionId is omitted."),
   sessionId: z.string().min(1).optional().describe("Real WorkBuddy desktop session ID. Required when several live sessions exist."),
-  sessionMode: z.enum(["existing", "new"]).optional().default("existing").describe("Queue supports existing only: first bootstrap a real native worker conversation. ACP new is version-dependent."),
+  sessionMode: z.enum(["existing", "new"]).optional().default("existing").describe("Queue uses project routing with existing; pass workspace for automatic native creation or selection. ACP new is version-dependent."),
   model: z.string().min(1).optional().describe("ACP-only model selection. Queue uses the desktop-selected model and rejects remote model changes."),
   constraints: z.array(z.string()).max(30).optional(), acceptanceCommands: z.array(z.string()).max(30).optional(), timeoutSeconds: timeout,
   detail,

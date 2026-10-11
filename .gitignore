@@ -6,6 +6,8 @@ work/
 .env.*
 !.env.example
 outputs/
+output/
+.playwright-cli/
 logs/
 *.log
 *.sqlite

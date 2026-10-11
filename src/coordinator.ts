@@ -1,4 +1,7 @@
 import fs from "node:fs";
+import { ensureWorkspace } from "./workspace-manager.js";
+import { readDesktopSession } from "./desktop-runtime.js";
+import { readWorkspaceWorkers } from "./workspace-workers.js";
 import path from "node:path";
 import crypto from "node:crypto";
 import type { Config } from "./config.js";
@@ -12,22 +15,29 @@ export interface SendTaskInput {
   timeoutSeconds?: number; sessionId?: string; model?: string; sessionMode?: "existing" | "new";
 }
 export class TaskCoordinator {
-  constructor(private readonly config: Config, readonly store: TaskStore, private readonly client: WorkBuddyClient) {}
+  constructor(private readonly config: Config, readonly store: TaskStore, private readonly client: WorkBuddyClient, private readonly resolveWorkspace = ensureWorkspace) {}
   private requireDesktop(): void {
     if (!["desktop-acp", "desktop-queue"].includes(this.config.backend)) throw new Error("Desktop supervision requires WORKBUDDY_BACKEND=desktop-queue or desktop-acp. CLI and hidden gateway execution do not prove execution in your WorkBuddy desktop conversation.");
   }
   async send(input: SendTaskInput) {
     this.requireDesktop();
-    if (this.config.backend === "desktop-queue") {
-      const registration = readServiceRegistration(this.config.serviceConfigFile ?? path.join(path.dirname(this.config.dbFile), "persistent-service.json"));
-      if (registration && path.resolve(registration.dbFile) === path.resolve(this.config.dbFile)) {
-        input = { ...input, sessionId: input.sessionId ?? registration.sessionId, workspace: input.workspace ?? registration.workspace };
-      }
-    }
     const taskId = input.taskId ?? `codex-${crypto.randomUUID()}`;
     const previous = this.store.get(taskId);
     if (previous) return { ok: true, created: false, task: previous, message: "Task already exists; no second prompt was dispatched. Use get/wait or continue after review." };
     if (input.workspace && (!path.isAbsolute(input.workspace) || !fs.statSync(input.workspace).isDirectory())) throw new Error("workspace must be an existing absolute directory");
+    if (this.config.backend === "desktop-queue"&&!input.model&&input.sessionMode!=='new') {
+      const registration = readServiceRegistration(this.config.serviceConfigFile ?? path.join(path.dirname(this.config.dbFile), "persistent-service.json"));
+      if (registration && path.resolve(registration.dbFile) === path.resolve(this.config.dbFile)) {
+        if(!input.workspace&&!input.sessionId&&new Set(readWorkspaceWorkers(this.config,registration).filter(worker=>worker.selected).map(worker=>worker.workspace)).size>1)throw new Error("Several project workspaces are registered; provide workspace or sessionId instead of silently using the legacy default");
+        const workspace=input.workspace??(input.sessionId?readDesktopSession(this.config.workbuddyConfigDir,input.sessionId).cwd:registration.workspace);
+        if(!workspace)throw new Error("Cannot determine the chosen native session workspace");
+        const selected=await this.resolveWorkspace(this.config,{workspace,sessionId:input.sessionId});
+        input={...input,workspace:selected.workspace,sessionId:selected.sessionId};
+      } else if(input.workspace&&!input.sessionId) {
+        const selected=await this.resolveWorkspace(this.config,{workspace:input.workspace});
+        input={...input,workspace:selected.workspace,sessionId:selected.sessionId};
+      }
+    }
     const initial = this.store.createOrGet({ taskId, messageId: `pending-${taskId}`, objective: input.objective, workspace: input.workspace, constraints: input.constraints, acceptanceCommands: input.acceptanceCommands, state: "queued", sessionId: input.sessionId });
     if (!initial.created) return { ok: true, created: false, task: initial.task };
     return this.dispatch(initial.task, buildTaskPrompt({ ...input, taskId, timeoutSeconds: input.timeoutSeconds ?? this.config.taskTimeoutSeconds ?? 1800 }), input);
@@ -38,6 +48,8 @@ export class TaskCoordinator {
     // A reservation is not execution provenance. The actual worker supplies it.
     this.store.updateAttempt(task.taskId, attemptId, { runtimeSource: null });
     try {
+      if(this.config.backend==='desktop-queue'&&input.model)throw new Error("Queue tasks use the model selected in WorkBuddy; remote model changes are not supported");
+      if(this.config.backend==='desktop-queue'&&input.sessionMode==='new')throw new Error("Use workspace or ensure_workspace for native project routing; sessionMode:new is not supported by the queue");
       await this.client.sendMessage(prompt, task.workspace, input.timeoutSeconds, input.sessionId ?? task.sessionId, { taskId: task.taskId, attemptId, model: input.model, sessionMode: input.sessionMode });
       return { ok: true, created: true, task: this.store.get(task.taskId), next: "Call workbuddy_wait repeatedly. Read progress, then inspect actual artifacts. Use continue for corrections and accept only after verifying evidence." };
     } catch (error) {

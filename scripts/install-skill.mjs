@@ -9,7 +9,7 @@ const source = path.join(root, "skills", "workbuddy-executor");
 const home = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
 const parent = path.join(home, "skills");
 const target = path.join(parent, "workbuddy-executor");
-const files = ["SKILL.md", "agents/openai.yaml", "references/setup.md"];
+const files = ["SKILL.md", "agents/openai.yaml", "references/setup.md", "references/agent-hub.md"];
 
 // Explicit copy list prevents configuration, task history or local artifacts
 // from entering a skill installation.

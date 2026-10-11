@@ -1,6 +1,6 @@
-# 首次连接、持久服务或临时监听恢复
+# 首次连接、多项目接入或临时监听恢复
 
-仅在 MCP 缺失、首次安装或连接异常时读取。日常任务使用 SKILL.md 的精简派工流程。持久服务与临时监听使用不同恢复方式，先核对现有安装。
+这里是旧 workbuddy MCP 的兼容连接流程。v0.7.0 新任务的 Agent Hub 入口先读 [统一接入](agent-hub.md)；已有直连任务继续按本页恢复。仅在 MCP 缺失、首次安装或连接异常时读取，日常任务使用 SKILL.md 的精简派工流程。
 
 ## 项目未配置
 
@@ -32,7 +32,22 @@ codex mcp add workbuddy -- "$PROJECT_DIR/bin/workbuddy-gateway"
 
 更新注册后需要重新加载对应 MCP 或新开 Codex 对话，新版 `detail: brief` 参数才生效。只注册桥接器不代表桌面已连接，不覆盖无关 MCP。Skill 安装命令为 `npm run skill:install`；独立 Skill 包不包含 Gateway，仍需完整项目和已配置的 MCP。
 
-## 首次安装持久服务
+## v0.6.0 默认原生接入
+
+确定当前业务项目的真实绝对目录，调用 `workbuddy_ensure_workspace({workspace})`，通过原生接口创建或复用该目录的会话。首次没有持久服务时自动安装；已有服务时增加项目映射，保留旧默认与执行中任务。用户不需要手动新建聊天或粘贴指令。指定已有 `sessionId` 时核对其原生目录并选择，切换不迁移旧任务或返工。
+
+新工具尚未出现在旧对话时，可以从任意目录通过完整项目脚本调用：
+
+```sh
+node /path/to/gateway/scripts/workbuddy-call.mjs workbuddy_ensure_workspace '{"workspace":"/absolute/project","detail":"brief"}'
+node /path/to/gateway/scripts/workbuddy-call.mjs workbuddy_list_workspaces '{}'
+```
+
+脚本的启动器加载已配置的 .env，不需要复制桥接器到业务项目。使用 `send_task` 时明确传业务 `workspace`；多个已登记项目时不得依赖旧默认。创建前会记录预留原生 ID，创建连接异常不得盲目重发；原生记录出现后可复用恢复，或由用户明确选择另一已有会话。登录和原生授权仍按实际请求处理，不改权限设置。
+
+构建升级后重新加载持久服务，使其监督全部登记项目；服务进程的重载不重派 WorkBuddy 执行中任务。尚未完成的原生业务任务仍继续使用原 taskId 和会话恢复查询。
+
+## 旧版兼容：手动安装持久服务
 
 1. 先恢复已有任务；`working` 时没有等待中的 helper 是正常情况，继续等该任务，不重启。确实没有活跃执行任务且监听未启动时，让用户在 WorkBuddy 登录，打开专用对话并发一条普通消息，使会话进入原生历史。只在确实缺少这一步时要求用户完成。
 2. 调用 `workbuddy_health(detail: brief)`，核对候选 sessionId 和实际工作目录。多个候选不确定时让用户指明；不自动选最新会话。
@@ -54,7 +69,7 @@ codex mcp add workbuddy -- "$PROJECT_DIR/bin/workbuddy-gateway"
 ## 不一致或阻塞
 
 - 后端为旧 `api`、`gateway`、`cli` 或不适配版本的 `desktop-acp` 时，先如实说明路线差异，不能把隐藏执行器当用户桌面 WorkBuddy。
-- 队列不支持远程选模型、新建桌面会话或用 `respond_task` 绕过原生权限；权限请求由用户在 WorkBuddy 处理。
+- 队列不支持远程选模型，也不能用 `respond_task` 绕过原生权限；新会话通过 v0.6.0 的 `ensure_workspace` 原生创建，不能使用 `sessionMode:new` 代替。权限请求由用户在 WorkBuddy 处理。
 - MCP 断线用原 taskId 恢复，不重新派相同目标。任务期限届满按 blocked 处理，不自动重发。
 - 已领取轮次因应用崩溃中断、领取未闭合或唤醒提交不确定时，检查原会话、轮次与已有文件，明确阻塞后再决定恢复；服务不能静默重执行。不要把正常退出重开恢复当作中断任务自动重跑的许可。
 - 取消是协作请求，不保证已执行操作回滚。需要确认停下时检查现有状态和必要记录，不操作桌面 UI。

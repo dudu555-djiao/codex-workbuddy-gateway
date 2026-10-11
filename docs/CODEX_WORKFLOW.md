@@ -2,13 +2,17 @@
 
 目标是桌面 WorkBuddy 执行，Codex 派工、读取回报、提出修改和检查成果。构建或模拟测试通过不能当作实机成功。
 
-使用 [WorkBuddy 执行官 Skill](../skills/workbuddy-executor/SKILL.md)，通过 `npm run skill:install` 安装。它默认精简监督、不使用 Computer Use，日常任务优先 `detail: brief`。v0.4.1 持久模式首次由用户在真实专用会话粘贴一次安装指令；之后任务或返工进入队列，本机服务通过原生 RPC 按需唤醒同一会话。空闲时不调用模型。单独 Skill 不提供 Gateway 或持久服务。
+使用 [WorkBuddy 执行官 Skill](../skills/workbuddy-executor/SKILL.md)，通过 `npm run skill:install` 安装。它默认精简监督、不使用 Computer Use，日常任务优先 `detail: brief`。v0.6.0 根据业务项目目录原生创建或复用执行会话，无需用户手动打开聊天或粘贴安装指令；一个持久服务按项目唤醒各自的会话。空闲时不调用模型。单独 Skill 不提供 Gateway 或持久服务。
 
 ## 配置
 
 获取完整源码，核对版本。若仓库只有 README 与 ZIP，先解压包，再进入含 `package.json` 的目录。完成依赖、构建、测试，设置 `WORKBUDDY_BACKEND=desktop-queue`，保留现有文件、任务记录及其他 MCP。注册或更新当前桥接器后重启 MCP。
 
 ## 启动和选择会话
+
+v0.6.0 优先用 `workbuddy_ensure_workspace({workspace:"当前业务项目的绝对目录"})`。已有匹配会话就复用，缺少时原生创建；用户明确指定同目录的 `sessionId` 时选择该会话。派工总是传该 `workspace`，不使用桥接器源码目录或旧默认目录代替业务目录。没有待执行任务时可以用 `list_workspaces` 查登记情况；有 taskId 时直接恢复原任务，不重派。旧会话上的返工保持原身份。
+
+以下编号步骤为旧版手动接入流程，仅供兼容和排障：
 
 1. 打开真实 WorkBuddy 专用对话并发一条普通消息。读取 health 的 `workerCandidates`，按原生工作目录核对会话 ID；候选历史不代表活跃监听器。
 2. 新的持久连接调用 `workbuddy_prepare_worker({sessionId, persistent: true})`，将返回的完整安装 prompt 交给用户一次粘贴到同一个真实 WorkBuddy 会话。WorkBuddy 用自己的 Bash 安装用户级 LaunchAgent；不通过 Computer Use 代粘贴。只生成 prompt 不能报告已安装。

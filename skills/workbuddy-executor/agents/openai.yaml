@@ -1,7 +1,7 @@
 interface:
   display_name: "WorkBuddy 执行官"
-  short_description: "让桌面 WorkBuddy 执行任务，Codex 精简派工、必要抽查与同会话返工"
-  default_prompt: "使用 $workbuddy-executor，让桌面 WorkBuddy 执行我的任务，Codex 只做精简派工和必要验收。"
+  short_description: "通过 Agent Hub 调用桌面 WorkBuddy，支持独立项目、任务恢复和同会话返工"
+  default_prompt: "使用 $workbuddy-executor，通过 Agent Hub 让桌面 WorkBuddy 执行我的任务，核对真实成果并按需返工。"
 dependencies:
   tools:
     - type: "mcp"

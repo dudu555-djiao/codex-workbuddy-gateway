@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+AGENT_HUB_CALLER_CWD=$PWD
+export AGENT_HUB_CALLER_CWD
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$ROOT"
+if [ -f "$ROOT/.env" ]; then
+  set -a
+  . "$ROOT/.env"
+  set +a
+fi
+exec "${WORKBUDDY_NODE_BIN:-node}" "$ROOT/dist/platform/cli.js" "$@"

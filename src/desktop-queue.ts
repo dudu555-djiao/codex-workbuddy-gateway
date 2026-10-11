@@ -130,7 +130,7 @@ export class DesktopQueue {
             }
             return locked(path.join(journal.dir, "queue-write.lock"), () => {
               const current = journal.snapshot()!;
-              if (current.status !== "queued") return undefined;
+              if (current.status !== "queued" || journal.cancellationRequested()) return undefined;
               if (current.deadline && Date.parse(current.deadline) <= Date.now()) { this.expire(journal, current); return undefined; }
               const leaseToken = crypto.randomBytes(24).toString("hex");
               writePrivateJson(path.join(journal.dir, "claim.json"), { sessionId, leaseHash: key(leaseToken), desktopPid: actor.desktopPid, claimedAt: new Date().toISOString() } satisfies Claim);
@@ -155,6 +155,23 @@ export class DesktopQueue {
       return { ok: true, cancellationRequested: journal.cancellationRequested() };
     });
   }
+  requestCancellation(attemptId: string): boolean {
+    if (!/^run-[a-f0-9-]{36}$/.test(attemptId.split(":")[0]!)) return false;
+    const journal = new RunJournal(this.root, attemptId.split(":")[0]!);
+    const snapshot = journal.snapshot();
+    if (!snapshot || TERMINAL.has(snapshot.status)) return false;
+    journal.cancel();
+    // Claim checks this flag under the same lock. An unclaimed run can be
+    // definitively cancelled; a claimed run must acknowledge that it stopped.
+    locked(path.join(journal.dir, "queue-write.lock"), () => {
+      const current = journal.snapshot()!;
+      if (current.status === "queued" && !fs.existsSync(path.join(journal.dir, "claim.json"))) {
+        journal.save({ ...current, status: "cancelled", stopReason: "cancelled_before_claim" });
+        journal.append("result", "TASK_STATUS: cancelled\nCancelled before native claim.", { status: "cancelled", stopReason: "cancelled_before_claim", sessionId: current.sessionId });
+      }
+    });
+    return true;
+  }
   report(input: {sessionId: string; attemptId: string; leaseToken: string; status: "completed" | "blocked" | "failed" | "cancelled"; text: string; artifacts: string[]}): {ok: true; status: string} {
     const actor = this.verifyActor();
     return this.mutateClaim(input, actor, (journal, snapshot) => {
@@ -164,6 +181,32 @@ export class DesktopQueue {
       journal.append("result", input.text.slice(0, 1_000_000), { status, artifacts: input.artifacts, sessionId: input.sessionId, runtimeSource: SOURCE, stopReason: input.status === "completed" ? "end_turn" : input.status });
       return { ok: true, status };
     });
+  }
+  /** Close an expired lease after a separate native idle check. This is NOT a worker result. */
+  confirmExpiredStop(input: { taskId: string; attemptId: string; sessionId: string; workspace: string; observedAt: string; reason: string }): { ok: true; alreadyRecovered: boolean } {
+    const journal = new RunJournal(this.root, input.attemptId);
+    return locked(path.join(this.root, "queue-session-locks", `${key(input.sessionId)}.lock`), () => locked(path.join(journal.dir, "queue-write.lock"), () => {
+      const store = new TaskStore(this.config.dbFile);
+      try {
+        const task = store.get(input.taskId);
+        const snapshot = journal.snapshot();
+        const request = journal.request();
+        const claim = readJson<Claim>(path.join(journal.dir, "claim.json"));
+        if (!task || task.attemptId !== input.attemptId || task.sessionId !== input.sessionId || task.state !== "blocked") throw new Error("Recovery requires the current blocked task attempt and its original session");
+        if (!snapshot || snapshot.driver !== "desktop-queue" || snapshot.taskId !== input.taskId || snapshot.sessionId !== input.sessionId || snapshot.status !== "blocked" || !claim || claim.sessionId !== input.sessionId) throw new Error("Recovery requires a claimed, blocked desktop queue attempt");
+        if (task.workspace !== input.workspace || request.workspace !== input.workspace || request.sessionId !== input.sessionId) throw new Error("Recovery workspace or session does not match the original task");
+        if (!snapshot.deadline || Date.parse(snapshot.deadline) > Date.now() || journal.cancellationRequested()) throw new Error("Only an expired, uncancelled attempt can be recovered");
+        if (snapshot.stopReason === "native_idle_verified") return { ok: true, alreadyRecovered: true };
+        if (snapshot.stopReason) throw new Error("This attempt already has a terminal stop reason");
+        if (!input.reason.trim() || !Number.isFinite(Date.parse(input.observedAt)) || Math.abs(Date.now() - Date.parse(input.observedAt)) > 10_000) throw new Error("Recovery requires a fresh native idle observation and an inspection reason");
+        const evidence = readDesktopSession(this.config.workbuddyConfigDir, input.sessionId);
+        if (!evidence.registered || evidence.cwd !== input.workspace) throw new Error("Original native desktop registration no longer matches");
+        writePrivateJson(path.join(journal.dir, "recovery.json"), { ...input, source: "native_rpc_idle_inspection", taskCompleted: false, recoveredAt: new Date().toISOString() });
+        journal.save({ ...snapshot, stopReason: "native_idle_verified" });
+        journal.append("status", `Expired attempt confirmed stopped through native idle inspection. Existing artifacts and failure history preserved. No task was completed or resent. Reason: ${input.reason}`, { status: "blocked", sessionId: input.sessionId, stopReason: "native_idle_verified", recovery: true });
+        return { ok: true, alreadyRecovered: false };
+      } finally { store.close(); }
+    }));
   }
   private mutateClaim<T>(input: {sessionId: string; attemptId: string; leaseToken: string}, actor: DesktopActor, action: (journal: RunJournal, snapshot: RunSnapshot) => T): T {
     const journal = new RunJournal(this.root, input.attemptId);

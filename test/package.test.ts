@@ -38,9 +38,11 @@ async function fixture() {
     "docs/CODEX_WORKFLOW.md": "# Supervision\n",
     "scripts/package.mjs": "// Fixture packaging source\n",
     "scripts/install-skill.mjs": "// Fixture installer\n",
+    "scripts/agent-hub-call.mjs": "// Hub MCP client\n",
     "skills/workbuddy-executor/SKILL.md": "---\nname: workbuddy-executor\ndescription: Delegate to desktop WorkBuddy.\n---\n# Skill\n",
     "skills/workbuddy-executor/agents/openai.yaml": "interface:\n  display_name: WorkBuddy\n",
     "skills/workbuddy-executor/references/setup.md": "# Setup\n",
+    "skills/workbuddy-executor/references/agent-hub.md": "# Hub\n",
     "skills/workbuddy-executor/private-log.md": "private task history\n",
     "skills/unrelated/SKILL.md": "unrelated personal skill\n",
     "bin/deepseek-gateway": "#!/bin/sh\nexit 0\n",
@@ -67,6 +69,14 @@ async function fixture() {
     files[`src/deepseek-${name}.ts`] = "export {};\n";
     files[`dist/deepseek-${name}.js`] = "export {};\n";
   }
+  for (const name of ["contracts", "store", "workbuddy", "engine", "http", "client", "ui", "cli", "mcp"]) {
+    files[`src/platform/${name}.ts`] = "export {};\n";
+    files[`dist/platform/${name}.js`] = "export {};\n";
+    files[`dist/platform/${name}.d.ts`] = "export {};\n";
+  }
+  for (const name of ["bin/agent-hub", "bin/agent-hub-mcp", "docs/AGENT_HUB.md", "docs/AGENT_HUB_DESIGN.md"]) files[name] = "fixture\n";
+  files["data/platform/api-token"] = "private platform token fixture\n";
+  files["dist/platform/client.d.ts"] = "export {};\n";
   for (const name of ["index.mjs", "adapter.mjs", "events.mjs", "transport.mjs", "package.json", "cordis.patch.yml", "README.md", "test/adapter.test.mjs", "test/events.test.mjs", "test/transport.test.mjs"]) files[`deepseek-plugin/${name}`] = "fixture\n";
   for (const [name, content] of Object.entries(files)) {
     const target = path.join(source, name);
@@ -87,6 +97,7 @@ test("release archive uses a file allowlist and hashes every included file", asy
     assert.ok(selected.includes("dist/desktop-worker-cli.js"));
     for (const filename of ["bin/workbuddy-service", "dist/persistent-service.js", "dist/service-cli.js", "dist/native-desktop-trigger.js"]) assert.ok(selected.includes(filename));
     assert.ok(selected.includes("docs/QUEUE_WORKER.md"));
+    for (const name of ["bin/agent-hub", "bin/agent-hub-mcp", "docs/AGENT_HUB.md", "src/platform/engine.ts", "dist/platform/cli.js", "dist/platform/ui.js"]) assert.ok(selected.includes(name), name);
     assert.ok(!selected.some((name: string) => /^(?:data|outputs|node_modules)\//.test(name)));
     assert.ok(!selected.includes(".env"));
     assert.ok(!selected.includes("docs/private-log.md"));
@@ -128,12 +139,12 @@ test("release collection requires the persistent service wrapper and complete na
   } finally { await fs.rm(value.root, { recursive: true, force: true }); }
 });
 
-test("standalone skill archive contains only the three portable instruction files", async () => {
+test("standalone skill archive contains only the four portable instruction files", async () => {
   const value = await fixture();
   try {
     const result = await createSkillPackage(value.source, value.output, "0.3.1");
     const listing = (await execute("unzip", ["-Z1", result.archive])).stdout.split("\n").filter((name) => name && !name.endsWith("/"));
-    assert.deepEqual(listing.sort(), ["workbuddy-executor/SKILL.md", "workbuddy-executor/agents/openai.yaml", "workbuddy-executor/references/setup.md"].sort());
+    assert.deepEqual(listing.sort(), ["workbuddy-executor/SKILL.md", "workbuddy-executor/agents/openai.yaml", "workbuddy-executor/references/setup.md", "workbuddy-executor/references/agent-hub.md"].sort());
     assert.equal(result.sha256, crypto.createHash("sha256").update(await fs.readFile(result.archive)).digest("hex"));
     await assert.rejects(createSkillPackage(value.source, value.output, "0.3.1"), /overwrite/);
   } finally { await fs.rm(value.root, { recursive: true, force: true }); }

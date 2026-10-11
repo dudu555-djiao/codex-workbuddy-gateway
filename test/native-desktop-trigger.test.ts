@@ -13,6 +13,7 @@ type Envelope = { id: string; type: string; channel: string; args: unknown[]; re
 type Frame = { kind: string; json?: Envelope; text?: string };
 type RequestHandler = (request: Envelope, native: NativeFixture) => unknown | Promise<unknown>;
 type Bridge = {
+  createWorker(workspace:string,sessionId:string,title?:string):Promise<{sessionId:string;workspace:string}>;
   inspect(sessionId: string): Promise<{ state: string; workspace?: string; [key: string]: unknown }>;
   findWake(sessionId: string, wakeId: string): Promise<boolean>;
   wakeIdle(sessionId: string, wakeId: string, prompt: string): Promise<{ accepted: boolean; [key: string]: unknown }>;
@@ -78,7 +79,7 @@ class NativeFixture {
     }, delay === 100 ? 0 : delay);
     const context = vm.createContext({ window, MessageChannel: FakeMessageChannel, crypto: webcrypto, Date: FixtureDate, setTimeout: fixtureTimeout, clearTimeout, console });
     this.ready = Promise.resolve(vm.runInContext(RENDERER_BRIDGE, context)).then(() => {
-      this.bridge = vm.runInContext("globalThis.__codexNativeQueueBridgeV1", context) as Bridge;
+      this.bridge = vm.runInContext("globalThis.__codexNativeQueueBridgeV2", context) as Bridge;
       assert.ok(this.bridge, "renderer bridge must install its explicit native protocol entry point");
     });
   }
@@ -116,6 +117,30 @@ class NativeFixture {
 
   close() { for (const port of this.ports) port.postMessage({ kind: "close" }); }
 }
+
+test("native creation initializes the directory and creates a real session without prompts or model overrides",async()=>{
+  const f=new NativeFixture();await f.ready;
+  const id='11111111-1111-4111-8111-111111111111';
+  f.handler=request=>{
+    if(request.channel==='workspace:initialize')return{success:true};
+    if(request.channel==='session:create')return{sessionId:id,cwd:f.workspace};
+    if(request.channel==='session:rename')return{};
+    return f.defaultResponse(request);
+  };
+  const result=await f.bridge.createWorker(f.workspace,id,'Project worker');
+  assert.equal(result.sessionId,id);assert.equal(result.workspace,f.workspace);
+  assert.deepEqual(f.requests.map(r=>r.channel),['workspace:initialize','session:create','session:rename']);
+  assert.equal(JSON.stringify(f.requests[1]!.args),JSON.stringify([{cwd:f.workspace,sessionId:id,isPlayground:false}]));
+  assert.equal(f.sends().length,0);
+});
+
+test("native creation refuses another session identity; a newly created pending session is idle",async()=>{
+  const f=new NativeFixture();await f.ready;
+  f.handler=request=>request.channel==='workspace:initialize'?{success:true}:request.channel==='session:create'?{sessionId:'wrong',cwd:f.workspace}:f.defaultResponse(request);
+  await assert.rejects(f.bridge.createWorker(f.workspace,'requested'),/different identity/);
+  assert.equal(f.sends().length,0);f.session.status='Pending';
+  assert.equal((await f.bridge.inspect(f.sessionId)).state,'idle');
+});
 
 const WAKE_A = "wake-run-11111111-1111-1111-1111-111111111111";
 const WAKE_B = "wake-run-22222222-2222-2222-2222-222222222222";
@@ -381,7 +406,7 @@ test("a replacement native root or newly occupied port prevents another launch",
 });
 
 test("active or unavailable persisted status evidence keeps the running desktop untouched", async (t) => {
-  for (const statuses of [["completed", "working"], ["pending"], ["unknown"], []]) {
+  for (const statuses of [["completed", "working"], ["pending"], ["unknown"]]) {
     const f = new LifecycleFixture(t, statuses);
     await assert.rejects(f.discover(), /Waiting for native WorkBuddy tasks/);
     assert.equal(f.quits().length, 0);
@@ -392,6 +417,12 @@ test("active or unavailable persisted status evidence keeps the running desktop 
   await assert.rejects(f.discover(), /Waiting for native WorkBuddy tasks/);
   assert.equal(f.quits().length, 0);
   assert.equal(f.launches.length, 0);
+});
+
+test("an initialized empty desktop history permits first-time port setup without manually creating a chat",async t=>{
+  const f=new LifecycleFixture(t,[]);
+  await assert.rejects(f.discover(),/local RPC port did not become available/);
+  assert.equal(f.quits().length,1);assert.equal(f.launches.length,1);
 });
 
 test("archived, terminated, and error historical sessions do not block an otherwise idle setup", async (t) => {

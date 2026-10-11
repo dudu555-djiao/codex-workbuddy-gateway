@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 // The renderer forwards requests into the desktop's existing local daemon.
 // No UI controls, account tokens, CLI host or model are created by this code.
 export const RENDERER_BRIDGE = String.raw `(async function(){
-  if(globalThis.__codexNativeQueueBridgeV1) return true;
+  if(globalThis.__codexNativeQueueBridgeV2) return true;
   const mc=new MessageChannel(), pending=new Map(), markers=new Map(), outgoing=new Map();
   let sequence=0, openResolve, closed=false;
   const opened=new Promise(resolve=>openResolve=resolve);
@@ -47,7 +47,7 @@ export const RENDERER_BRIDGE = String.raw `(async function(){
     const waiting=session.pendingInputKind||(session.pendingPermissions?.length)||(session.pendingQuestions?.length)||(session.pendingElicitations?.length);
     if(waiting)return {state:'waiting_input',workspace:session.cwd,reason:'WorkBuddy requires native permission or input'};
     if(outgoing.has(sid)||active.some(s=>(s.sessionId||s.id)===sid||s.cwd===session.cwd)||session.isProcessing||session.stopRequested||session.hasActiveTeamMembers||session.hasActiveToolCalls)return {state:'busy',workspace:session.cwd,reason:'Native WorkBuddy session is active'};
-    if(!['completed','failed','cancelled','idle','stopped'].includes(session.status))return {state:'busy',workspace:session.cwd,reason:'Native state is not confirmed idle: '+String(session.status)};
+    if(!['completed','failed','cancelled','idle','stopped','pending'].includes(String(session.status).toLowerCase()))return {state:'busy',workspace:session.cwd,reason:'Native state is not confirmed idle: '+String(session.status)};
     return {state:'idle',workspace:session.cwd};
   };
   const findWake=async(sid,wakeId)=>{
@@ -72,7 +72,15 @@ export const RENDERER_BRIDGE = String.raw `(async function(){
     }
     throw Error('Native submission receipt is uncertain; do not automatically replay');
   };
-  globalThis.__codexNativeQueueBridgeV1={inspect,findWake,wakeIdle};
+  const createWorker=async(workspace,sessionId,title)=>{
+    const initialized=await rpc('workspace:initialize',[{cwd:workspace}]);
+    if(!initialized?.success)throw Error(initialized?.error||'Native workspace initialization failed');
+    const created=await rpc('session:create',[{cwd:workspace,sessionId,isPlayground:false}],45000);
+    if(created?.sessionId!==sessionId||created?.cwd!==workspace)throw Error('Native session creation returned a different identity or workspace; do not replay');
+    if(title)await rpc('session:rename',[sessionId,title]);
+    return {sessionId:created.sessionId,workspace:created.cwd};
+  };
+  globalThis.__codexNativeQueueBridgeV2={inspect,findWake,wakeIdle,createWorker};
   return true;
 })()`;
 const DEFAULT_PROCESS_CONTROL = {
@@ -149,7 +157,7 @@ export class NativeDesktopRpcTrigger {
             // before the one-time graceful restart needed for the startup setting.
             db = new DatabaseSync(path.join(this.config.workbuddyConfigDir, "workbuddy.db"), { readOnly: true });
             const rows = db.prepare("SELECT status FROM sessions WHERE deleted_at IS NULL").all();
-            return rows.length > 0 && rows.every(row => ['completed', 'failed', 'cancelled', 'idle', 'stopped', 'archived', 'terminated', 'error'].includes(String(row.status).trim().toLowerCase()));
+            return rows.every(row => ['completed', 'failed', 'cancelled', 'idle', 'stopped', 'archived', 'terminated', 'error'].includes(String(row.status).trim().toLowerCase()));
         }
         catch {
             return false;
@@ -250,16 +258,24 @@ export class NativeDesktopRpcTrigger {
                 this.connection = undefined;
         }
     }
-    evaluateConnected(expression) {
+    evaluateConnected(expression, timeoutMs = 22000) {
         const socket = this.socket;
         if (socket?.readyState !== WebSocket.OPEN)
             return Promise.reject(new Error("Native desktop socket is closed"));
         const id = ++this.sequence;
-        return new Promise((resolve, reject) => { const timer = setTimeout(() => { this.pending.delete(id); reject(new Error("Native evaluation timed out; never replay an uncertain submission")); }, 22000); this.pending.set(id, { resolve, reject, timer }); socket.send(JSON.stringify({ id, method: "Runtime.evaluate", params: { expression, awaitPromise: true, returnByValue: true } })); });
+        return new Promise((resolve, reject) => { const timer = setTimeout(() => { this.pending.delete(id); reject(new Error("Native evaluation timed out; never replay an uncertain submission")); }, timeoutMs); this.pending.set(id, { resolve, reject, timer }); socket.send(JSON.stringify({ id, method: "Runtime.evaluate", params: { expression, awaitPromise: true, returnByValue: true } })); });
     }
     async call(method, args) {
         await this.connect();
-        return this.evaluateConnected(`globalThis.__codexNativeQueueBridgeV1.${method}(...${JSON.stringify(args)})`);
+        return this.evaluateConnected(`globalThis.__codexNativeQueueBridgeV2.${method}(...${JSON.stringify(args)})`);
+    }
+    async createWorker(workspace, sessionId, title) {
+        if (!path.isAbsolute(workspace) || !fs.statSync(workspace).isDirectory())
+            throw new Error("workspace must be an existing absolute directory");
+        if (!/^[a-f0-9-]{36}$/.test(sessionId))
+            throw new Error("A reserved native session UUID is required");
+        await this.connect();
+        return await this.evaluateConnected(`globalThis.__codexNativeQueueBridgeV2.createWorker(...${JSON.stringify([workspace, sessionId, title])})`, 55000);
     }
     async inspect(sessionId) {
         try {

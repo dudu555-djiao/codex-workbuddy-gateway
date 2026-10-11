@@ -89,6 +89,16 @@ test("queue cancellation is observed by native report; deadline blocks without r
   assert.equal((await f.queue.claim("unit-session", 0)).status, "retry");
 });
 
+test("cancellation before claim is definitive and cannot be claimed later", async t => {
+  const f = fixture(t); await f.send(); const task = f.store.get("unit-task")!;
+  assert.equal(f.client.cancel(task.messageId), true);
+  const journal = new RunJournal(f.queue.root, task.attemptId!);
+  assert.equal(journal.snapshot()?.stopReason, "cancelled_before_claim");
+  assert.equal((await f.queue.claim("unit-session", 0)).status, "retry");
+  assert.equal((await f.coordinator.sync("unit-task")).state, "cancelled");
+  assert.equal(fs.existsSync(path.join(journal.dir, "claim.json")), false);
+});
+
 test("production worker rejects Codex-side invocation", (t) => {
   const f = fixture(t);
   assert.throws(() => assertDesktopCaller({ ...f.config, cliElectronPath: path.join(f.dir, "nonexistent-native-desktop") }), /real WorkBuddy desktop/);

@@ -1,8 +1,8 @@
 {
   "name": "codex-workbuddy-gateway",
-  "version": "0.5.0",
+  "version": "0.7.0",
   "private": true,
-  "description": "Local MCP bridges for supervised tasks in native WorkBuddy and DeepSeek Harness sessions.",
+  "description": "Local Agent Hub with HTTP, MCP, SDK, CLI and a workbench; WorkBuddy executor and existing Harness bridge.",
   "type": "module",
   "engines": {
     "node": ">=22.13.0"
@@ -10,6 +10,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
+    "hub": "./bin/agent-hub serve",
+    "hub:mcp": "./bin/agent-hub-mcp",
     "auth": "node dist/auth.js",
     "dev": "tsx src/server.ts",
     "test": "tsx --test test/**/*.test.ts",

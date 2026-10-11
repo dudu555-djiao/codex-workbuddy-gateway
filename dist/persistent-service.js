@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { DesktopQueue } from "./desktop-queue.js";
 import { readDesktopSession } from "./desktop-runtime.js";
 import { RunJournal, runsDirectory, writePrivateJson } from "./run-journal.js";
+import { WorkspaceWorkers } from "./workspace-workers.js";
 export function serviceRegistrationPath(projectDir) {
     return path.join(projectDir, "data", "persistent-service.json");
 }
@@ -120,6 +121,47 @@ class ServicePumpLock {
             this.db.close();
         }
     }
+}
+/** Explicit operator recovery, never part of the automatic pump/retry loop. */
+export async function recoverExpiredAttempt(config, registration, trigger, input) {
+    const bound = registeredServiceConfig(config, registration);
+    const lock = new ServicePumpLock(runsDirectory(bound), registration.sessionId);
+    try {
+        if (!lock.acquire())
+            throw new Error("A service pump owns this session; retry recovery without dispatching a new task");
+        if (!input.reason.trim())
+            throw new Error("Describe the inspected native failure before recovery");
+        if (new DesktopQueue(bound).listeners().some((listener) => listener.sessionId === registration.sessionId))
+            throw new Error("A native helper is still waiting; recovery refused");
+        const native = await trigger.inspect(registration.sessionId);
+        if (native.state !== "idle" || native.workspace !== registration.workspace)
+            throw new Error(`Native session must be verified idle in the original workspace; observed ${native.state}`);
+        const result = new DesktopQueue(bound).confirmExpiredStop({ ...input, sessionId: registration.sessionId, workspace: registration.workspace, observedAt: new Date().toISOString() });
+        return { ...result, taskId: input.taskId, attemptId: input.attemptId, sessionId: registration.sessionId, state: "blocked", taskCompleted: false, next: "Use continue_task with specific recovery feedback, preserving valid existing artifacts." };
+    }
+    finally {
+        lock.close();
+    }
+}
+/** One launchd service supervises every enrolled native session independently. */
+export async function pumpWorkspaceWorkers(config, registration, trigger, store) {
+    const bound = registeredServiceConfig(config, registration);
+    const registry = new WorkspaceWorkers(bound);
+    let workers;
+    try {
+        registry.seed(registration);
+        workers = registry.list().filter(worker => worker.state === 'ready');
+    }
+    finally {
+        registry.close();
+    }
+    const results = [];
+    for (const worker of workers) {
+        const service = new PersistentDesktopService(bound, { ...registration, sessionId: worker.sessionId, workspace: worker.workspace }, trigger, store);
+        results.push({ ...await service.pump(), workspace: worker.workspace });
+    }
+    const current = results.find(result => result.status !== 'no_task') ?? results[0];
+    return { ...current, workers: results };
 }
 export class PersistentDesktopService {
     registration;
