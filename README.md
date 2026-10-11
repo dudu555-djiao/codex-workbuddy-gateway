@@ -1,6 +1,10 @@
-# Codex → WorkBuddy Desktop Bridge
+# Codex → WorkBuddy / DeepSeek Harness
 
-Codex 派任务和检查成果，桌面 WorkBuddy 使用自己的模型、工具和 Skill 执行；本机 Gateway 保存任务、回报及同一会话的返工记录。
+Codex 派任务、监督进度并独立检查成果，WorkBuddy 或 DeepSeek Harness 的原生会话使用自己的模型、工具和 Skill 实际执行。本机 MCP 保存任务、回报及同一会话的返工记录。
+
+**v0.5.0 新增 [Codex → DeepSeek Harness](docs/DEEPSEEK.md)**：独立的 `deepseek` MCP 0.1.1、原生 Host 插件及 `deepseek-executor` Skill，支持指定会话派工、恢复、返工、取消和验收。业务派工通过原生接口完成，不通过 Computer Use 操作聊天框。已在 macOS Harness App **0.2.0-rc.2** 实测文件任务、App 冷重启、原会话返工、订单汇总、等待输入与取消；网页 Host 未实测。当前项目127项测试和插件26项测试通过。
+
+完整下载和两个独立 Skill 包见 [v0.5.0 发布页](https://github.com/dudu555-djiao/codex-workbuddy-gateway/releases/tag/v0.5.0)。新装用户下载完整项目；已有可用 MCP 和插件的用户可只更新对应 Skill。DeepSeek 安装步骤见 [Harness 文档](docs/DEEPSEEK.md)，下文保留 WorkBuddy 的配置与使用方法。
 
 **v0.4.1 在 `desktop-queue` 上新增 macOS 持久服务：首次在真实 WorkBuddy 专用会话粘贴一次安装指令，之后按队列需要自动唤醒同一原生会话，空队列不调用模型。** 本轮在 WorkBuddy 5.7.6 实测通过桌面自行安装及 LaunchAgent 激活、自动文件任务、正常退出后普通方式重开、应用完全关闭后的自动启动、未开启调试端口时自动正常重启一次，以及回复结束后的同会话返工。四项小文件创建与一项返工的原生 Write/Read、Edit/Read、队列归属和真实内容均已核对，无 Computer Use；98 项自动化测试通过。用户登出再登录和系统重启未实测。本轮未测试业务搜索或视频；2026-10-08 的临时队列及官方价格查询记录仍保留，v0.2.0 的失败经过见 [失败复盘](docs/FAILURE_REVIEW.md)。
 
@@ -10,8 +14,9 @@ Codex 派任务和检查成果，桌面 WorkBuddy 使用自己的模型、工具
 
 | 使用情况 | 应下载的内容 | 还需做什么 |
 | --- | --- | --- |
-| 从没配置过这个项目 | 完整项目 `codex-workbuddy-gateway-v0.4.1.zip`，或含完整源码的仓库 | 安装依赖、配置 Gateway、注册 MCP、安装 Skill，在真实 WorkBuddy 会话安装持久服务 |
-| 已有可用 Gateway 和 MCP | `workbuddy-executor-v0.4.1.zip` | 将解压后的 `workbuddy-executor` 文件夹放入 Codex 配置目录的 `skills/`；通常为 `~/.codex/skills/`，持久服务还需升级完整 Gateway 至 v0.4.1 |
+| 从没配置过这个项目 | 完整项目 `codex-workbuddy-gateway-v0.5.0.zip`，或含完整源码的仓库 | 安装依赖，并按所选 WorkBuddy / Harness 文档配置对应 MCP 与执行端 |
+| 已有 WorkBuddy Gateway 和 MCP | `workbuddy-executor-v0.5.0.zip` | 将解压后的 `workbuddy-executor` 放入 Codex 配置目录的 `skills/`；持久服务要求完整 Gateway v0.4.1 或更新版本 |
+| 已有 DeepSeek MCP 0.1.1 与兼容原生插件 | `deepseek-executor-v0.5.0.zip` | 将解压后的 `deepseek-executor` 放入 Codex 配置目录的 `skills/`；单独 Skill 不含 MCP 或插件 |
 
 独立 Skill 包没有 `package.json`，不能在其中运行 `npm run skill:install`；该命令只在完整项目目录可用。要使用 `detail: brief`，Gateway 需为 v0.3.1 或更新版本；旧版没有该参数时 Skill 会使用兼容流程。
 
@@ -141,6 +146,6 @@ npm test
 npm run package
 ```
 
-打包白名单包含源码、编译产物、测试、启动器、文档、示例配置和本 Skill，输出完整项目 ZIP、SHA-256 与文件清单；另输出仅含三份指令文件的 `workbuddy-executor-v版本.zip`，方便已有 Gateway 的用户安装 Skill。排除 `.env`、`data/`、日志、会话记录、Cookie、工作成果、其他个人 Skill 和 `node_modules`。不会上传 GitHub。打包内容检查不能保证任意未来代码不带隐私，分享前仍应核对文件清单。
+打包白名单包含源码、编译产物、测试、启动器、文档、示例配置、Harness 原生插件及两个 Skill，输出完整项目 ZIP、SHA-256 与文件清单；另输出仅含三份指令文件的 `workbuddy-executor-v版本.zip` 和仅含两份指令文件的 `deepseek-executor-v版本.zip`。独立 Skill 包不包含 MCP 或插件。排除 `.env`、`data/`、日志、会话记录、Cookie、工作成果、其他个人 Skill 和 `node_modules`。打包命令只生成本地文件。打包内容检查不能保证任意未来代码不带隐私，分享前仍应核对文件清单。
 
 保留 `desktop-acp`、`cli`、`gateway` 和官方 `api` 兼容实现作历史用途；桌面监督只接受声明支持的桌面路线。当前 Mac 主路线是任务队列，持久服务在其上提供按需原生唤醒。98 项自动化测试及本轮四项小文件创建、一项返工均通过，覆盖运行中派工、正常重开、完全关闭自动启动与裸启动后自动启用端口。用户登出再登录和系统重启未实测；业务搜索、视频及复杂长任务不在本轮验证范围。WorkBuddy 升级后需重新核对原生 RPC 兼容性，不能保证所有未来版本可用。已有 Codex MCP 进程需重新加载新版。

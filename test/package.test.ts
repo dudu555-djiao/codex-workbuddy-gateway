@@ -43,6 +43,15 @@ async function fixture() {
     "skills/workbuddy-executor/references/setup.md": "# Setup\n",
     "skills/workbuddy-executor/private-log.md": "private task history\n",
     "skills/unrelated/SKILL.md": "unrelated personal skill\n",
+    "bin/deepseek-gateway": "#!/bin/sh\nexit 0\n",
+    "docs/DEEPSEEK.md": "# Harness bridge\n",
+    "scripts/install-deepseek-skill.mjs": "// Skill installer\n",
+    "scripts/install-deepseek-plugin.mjs": "// Native plugin installer\n",
+    "scripts/deepseek-call.mjs": "// Real MCP client\n",
+    "skills/deepseek-executor/SKILL.md": "---\nname: deepseek-executor\ndescription: Delegate to Harness.\n---\n# Skill\n",
+    "skills/deepseek-executor/references/setup.md": "# Setup\n",
+    "skills/deepseek-executor/private-log.md": "private history\n",
+    "deepseek-plugin/private-registration.json": "private connection data\n",
     ".env": "private configuration\n",
     "data/tasks.sqlite": "private database\n",
     "data/runs/run.json": "private execution events\n",
@@ -54,6 +63,11 @@ async function fixture() {
     "outputs/old.zip": "private archive\n",
     "node_modules/private/index.js": "private dependency\n",
   };
+  for (const name of ["server", "client", "store", "coordinator", "evidence"]) {
+    files[`src/deepseek-${name}.ts`] = "export {};\n";
+    files[`dist/deepseek-${name}.js`] = "export {};\n";
+  }
+  for (const name of ["index.mjs", "adapter.mjs", "events.mjs", "transport.mjs", "package.json", "cordis.patch.yml", "README.md", "test/adapter.test.mjs", "test/events.test.mjs", "test/transport.test.mjs"]) files[`deepseek-plugin/${name}`] = "fixture\n";
   for (const [name, content] of Object.entries(files)) {
     const target = path.join(source, name);
     await fs.mkdir(path.dirname(target), { recursive: true });
@@ -122,6 +136,30 @@ test("standalone skill archive contains only the three portable instruction file
     assert.deepEqual(listing.sort(), ["workbuddy-executor/SKILL.md", "workbuddy-executor/agents/openai.yaml", "workbuddy-executor/references/setup.md"].sort());
     assert.equal(result.sha256, crypto.createHash("sha256").update(await fs.readFile(result.archive)).digest("hex"));
     await assert.rejects(createSkillPackage(value.source, value.output, "0.3.1"), /overwrite/);
+  } finally { await fs.rm(value.root, { recursive: true, force: true }); }
+});
+
+test("complete release includes every Harness component but excludes private plugin files", async () => {
+  const value = await fixture();
+  try {
+    const selected = await collectReleaseFiles(value.source);
+    for (const name of ["bin/deepseek-gateway", "src/deepseek-evidence.ts", "dist/deepseek-server.js", "scripts/install-deepseek-plugin.mjs", "scripts/deepseek-call.mjs", "skills/deepseek-executor/SKILL.md", "docs/DEEPSEEK.md", "deepseek-plugin/index.mjs", "deepseek-plugin/test/adapter.test.mjs"]) assert.ok(selected.includes(name), name);
+    assert.ok(!selected.includes("deepseek-plugin/private-registration.json"));
+    assert.ok(!selected.includes("skills/deepseek-executor/private-log.md"));
+    await fs.rm(path.join(value.source, "deepseek-plugin/adapter.mjs"));
+    await assert.rejects(collectReleaseFiles(value.source), /Missing release file deepseek-plugin\/adapter.mjs/);
+  } finally { await fs.rm(value.root, { recursive: true, force: true }); }
+});
+
+test("standalone Harness skill archive includes instructions only and refuses unknown skills", async () => {
+  const value = await fixture();
+  try {
+    const result = await createSkillPackage(value.source, value.output, "0.5.0", "deepseek-executor");
+    const names = (await execute("unzip", ["-Z1", result.archive])).stdout.split("\n").filter(name => name && !name.endsWith("/"));
+    assert.deepEqual(names.sort(), ["deepseek-executor/SKILL.md", "deepseek-executor/references/setup.md"].sort());
+    assert.equal(result.files, 2);
+    assert.equal(result.sha256, crypto.createHash("sha256").update(await fs.readFile(result.archive)).digest("hex"));
+    await assert.rejects(createSkillPackage(value.source, value.output, "0.5.0", "unrelated"), /Unknown distributable skill/);
   } finally { await fs.rm(value.root, { recursive: true, force: true }); }
 });
 

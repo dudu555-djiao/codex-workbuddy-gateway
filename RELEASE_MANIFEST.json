@@ -1,6 +1,6 @@
 {
   "project": "codex-workbuddy-gateway",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "videoAcceptance": "pending_user_verification",
   "files": [
     {
@@ -15,8 +15,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 12764,
-      "sha256": "4a761f58d85cf254fe5378ed76eda35bcdcb8bf760982bda82662a12e700c44b"
+      "bytes": 13922,
+      "sha256": "ca594b992bb2cc13187ac684a73f5779bb8ac3c43c56a386829d809a14afa72f"
+    },
+    {
+      "path": "bin/deepseek-gateway",
+      "bytes": 173,
+      "sha256": "11065751f7076ecdfac6dc0b402b723995996bd89b2061169c48f3b69a5a52f6"
     },
     {
       "path": "bin/workbuddy-cli",
@@ -42,6 +47,56 @@
       "path": "bin/workbuddy-worker",
       "bytes": 224,
       "sha256": "2e3e5d55de2abdbc60a6edf23cb57ed1db8d2fb821fde7d258af7ca194927f73"
+    },
+    {
+      "path": "deepseek-plugin/README.md",
+      "bytes": 8654,
+      "sha256": "6496f4d6e14c91c0613296fd1e5ffedbdd4b940ebeba1a26135584228232d55a"
+    },
+    {
+      "path": "deepseek-plugin/adapter.mjs",
+      "bytes": 14694,
+      "sha256": "bccfe7ff2b5b0f349014bc6e42fb8bb5f2ae9c0c41a710c1e495a9676de76dc2"
+    },
+    {
+      "path": "deepseek-plugin/cordis.patch.yml",
+      "bytes": 103,
+      "sha256": "acbb3fdc426b2875e35fafe4821ed7c099e295c0bb3abbe9953e0712bc717cdb"
+    },
+    {
+      "path": "deepseek-plugin/events.mjs",
+      "bytes": 6806,
+      "sha256": "3b60dc3c7b92f886636f9fc6369426a8ef7f68b21a562c642836f6828bdc2617"
+    },
+    {
+      "path": "deepseek-plugin/index.mjs",
+      "bytes": 812,
+      "sha256": "d72c2fab9c649a9ba91331de6e3127f6e874c2648b479753c8a41d65eb5e6a62"
+    },
+    {
+      "path": "deepseek-plugin/package.json",
+      "bytes": 736,
+      "sha256": "134c870ce443da772e244744e3bc33514eb0bd2e5febef7f37e66c436d2397cf"
+    },
+    {
+      "path": "deepseek-plugin/test/adapter.test.mjs",
+      "bytes": 9590,
+      "sha256": "4375150866b2dd52c834aedce1bb2410420088a6e84c0f117985770918962292"
+    },
+    {
+      "path": "deepseek-plugin/test/events.test.mjs",
+      "bytes": 5949,
+      "sha256": "a0685efd3964e0d1db5582a566a6461eb878140a183c06711cdea995c34cb25b"
+    },
+    {
+      "path": "deepseek-plugin/test/transport.test.mjs",
+      "bytes": 6059,
+      "sha256": "514b8fe4ddfa95fa19af67a219d4cfa7a2260ee23f8b0464459179cf2b403faa"
+    },
+    {
+      "path": "deepseek-plugin/transport.mjs",
+      "bytes": 9235,
+      "sha256": "137fc932ad611686827d0b5ceb4daed4cb3778b2329bb15bcf02d8499a067904"
     },
     {
       "path": "dist/acp-live.js",
@@ -92,6 +147,56 @@
       "path": "dist/coordinator.js.map",
       "bytes": 11597,
       "sha256": "c427f3584be30aab0943b6f8a37f81fb81405fbd5704d736eb86647a7dacbe1a"
+    },
+    {
+      "path": "dist/deepseek-client.js",
+      "bytes": 5076,
+      "sha256": "3839919eab13336ac865b2cb569448ea34529fbc4ae7abc3d04d51a7d4936dd7"
+    },
+    {
+      "path": "dist/deepseek-client.js.map",
+      "bytes": 5385,
+      "sha256": "6ec0d6f352d504770224a1876a54733cf1fd5ff32908504e25403a56061fc09a"
+    },
+    {
+      "path": "dist/deepseek-coordinator.js",
+      "bytes": 13714,
+      "sha256": "dfe2c144e68be225f7138547f6274a896cb6a7eb8bf1333d0ead83148a6b1645"
+    },
+    {
+      "path": "dist/deepseek-coordinator.js.map",
+      "bytes": 11901,
+      "sha256": "4137b2f275520a21c4bc32e20f8ba21f5bef44bc4b9568e34dd42c2431ebcd85"
+    },
+    {
+      "path": "dist/deepseek-evidence.js",
+      "bytes": 2192,
+      "sha256": "ccdf3c8a7e2afee2097a26c93d6d4f151f8963e2cec6de6f33c4e5c4d1f27172"
+    },
+    {
+      "path": "dist/deepseek-evidence.js.map",
+      "bytes": 2849,
+      "sha256": "f06a170e58dc8c7c1785619969085d1c7b8d22d5951dff715ebdfaa0e750b59a"
+    },
+    {
+      "path": "dist/deepseek-server.js",
+      "bytes": 8644,
+      "sha256": "97c5c4531fec43354c19422ecee3caa81d943c9a5a3b96215e42c4ab38c6f9f9"
+    },
+    {
+      "path": "dist/deepseek-server.js.map",
+      "bytes": 9246,
+      "sha256": "b432faf0f26de379e6ff8451e7f7ff14e5e0b4cb1c283b0a6a8329f33fdc6b33"
+    },
+    {
+      "path": "dist/deepseek-store.js",
+      "bytes": 11573,
+      "sha256": "9c2b510085ec6fa8035cc5b63fb30f29a70b560bad671ac2f60de2250e32328c"
+    },
+    {
+      "path": "dist/deepseek-store.js.map",
+      "bytes": 10263,
+      "sha256": "6eb4663776c56bbbd4c5716c753b2e534231151604eb7d39ec74dd09d51e1249"
     },
     {
       "path": "dist/desktop-queue.js",
@@ -309,6 +414,11 @@
       "sha256": "15af1964b5da00bccc98feef83cf697e940413f68be6e67df8468d77b9aea71d"
     },
     {
+      "path": "docs/DEEPSEEK.md",
+      "bytes": 7971,
+      "sha256": "95dde4481e7e872b2ba9a7cbbc85958470e4ec8826ec21a60630c692d262c2df"
+    },
+    {
       "path": "docs/FAILURE_REVIEW.md",
       "bytes": 5758,
       "sha256": "773c359c2363476a26338cfb15b510039961d9d1a0bd03d87e1c1f65997bb86e"
@@ -331,12 +441,27 @@
     {
       "path": "package-lock.json",
       "bytes": 58937,
-      "sha256": "284b832afb399068ae45ebc35285a3736905e7dd15872492c9fb307dae963f20"
+      "sha256": "c01f9a7b3f73591728cf7dc15496133c6558e550047eddfbf9a08c94000732c5"
     },
     {
       "path": "package.json",
-      "bytes": 782,
-      "sha256": "2d69b1df5ec44929d9eb8ac496427b07476f9652bfa75bce1254a94849229803"
+      "bytes": 1066,
+      "sha256": "10f6f939f152923be1d9dbc8c92b98b642f2966d7654ebdccb8562fb7772ad10"
+    },
+    {
+      "path": "scripts/deepseek-call.mjs",
+      "bytes": 1517,
+      "sha256": "d0568a8ea7956123aa9249c38da3b798ca020ab3e6c4dd4584bfe2653f8a02fe"
+    },
+    {
+      "path": "scripts/install-deepseek-plugin.mjs",
+      "bytes": 3829,
+      "sha256": "076b1b9c0e7d6c34a16cc49a9a9845cc6c4d14f1d8d02d943585df49dbaa387b"
+    },
+    {
+      "path": "scripts/install-deepseek-skill.mjs",
+      "bytes": 2588,
+      "sha256": "ba70aaadd9acc8bccb3a50e994c72750b477d42f4363b137f84b360836c131bc"
     },
     {
       "path": "scripts/install-skill.mjs",
@@ -345,8 +470,18 @@
     },
     {
       "path": "scripts/package.mjs",
-      "bytes": 9019,
-      "sha256": "bf7e26a926e3f935e59ff00e812ecd41c9859218476a1d00d2479368894cc2f9"
+      "bytes": 10352,
+      "sha256": "0b8849b701c61f6e28e799942b51986de6d2741c1fc7601529674c50ba868cf3"
+    },
+    {
+      "path": "skills/deepseek-executor/SKILL.md",
+      "bytes": 4394,
+      "sha256": "22a6389766b47bf8dea5c0b22e792f168cb051b779f2e56b13e4e46803ff0964"
+    },
+    {
+      "path": "skills/deepseek-executor/references/setup.md",
+      "bytes": 2299,
+      "sha256": "5fc47d77fb5c44a092fc7891414e52d1b3aea7917b78f24da74b2c26d4de5953"
     },
     {
       "path": "skills/workbuddy-executor/SKILL.md",
@@ -387,6 +522,31 @@
       "path": "src/coordinator.ts",
       "bytes": 12872,
       "sha256": "fce6fc1895d2ebd5fab0a0cfdd3f7987a7bead265341305ccfff568604ef541c"
+    },
+    {
+      "path": "src/deepseek-client.ts",
+      "bytes": 6594,
+      "sha256": "cc8463eab46b7a68cd643817d08b4de8bc00772411788fc5afaf692cbfb1836d"
+    },
+    {
+      "path": "src/deepseek-coordinator.ts",
+      "bytes": 13322,
+      "sha256": "a74a8c5deb45552d1d313148c972ed4760223d90e9b7c032ad600787a14f5e43"
+    },
+    {
+      "path": "src/deepseek-evidence.ts",
+      "bytes": 2212,
+      "sha256": "7936d73964bd28a7fec91177d4afa8ac806e6b77893a42913343a91c59a43add"
+    },
+    {
+      "path": "src/deepseek-server.ts",
+      "bytes": 8620,
+      "sha256": "6c1cf1a1a705fd0427b843597be2aae601450c39e2cf9593e412c7c6eb873e01"
+    },
+    {
+      "path": "src/deepseek-store.ts",
+      "bytes": 12101,
+      "sha256": "b7977b819adef515abd03a32ec30d1e30c0771fb355b582844d472b318ee727c"
     },
     {
       "path": "src/desktop-queue.ts",
@@ -469,6 +629,21 @@
       "sha256": "f134fe9d511dbf6bc6345c8f1473ef3cdab7f173e470f8c1b02f31773f46d7df"
     },
     {
+      "path": "test/deepseek-client.test.ts",
+      "bytes": 4758,
+      "sha256": "49daffcbfe14afb9d03a209100b692fe84153034c4c5a93c485c3ca9b6672d0e"
+    },
+    {
+      "path": "test/deepseek-coordinator.test.ts",
+      "bytes": 20900,
+      "sha256": "334b8e05d5f0872317d34254672e2a94af4b6b4f3480c91038b36fd331bbbccd"
+    },
+    {
+      "path": "test/deepseek-server.test.ts",
+      "bytes": 5575,
+      "sha256": "962c76a3f255bd5aff4a85f6c085ed8afbaf7f0ba0caeb50b20ad6eb1845058f"
+    },
+    {
       "path": "test/desktop-queue.test.ts",
       "bytes": 7556,
       "sha256": "df015d4065b569ae908e0c1ef83dbbd2ebaee04bc35e5d90f7f45fc45a300d1e"
@@ -485,8 +660,8 @@
     },
     {
       "path": "test/package.test.ts",
-      "bytes": 8418,
-      "sha256": "ff7c2da20cb62b184be769c123ad0bfb58c151db8da034403ddf9e54c5e535d4"
+      "bytes": 11335,
+      "sha256": "f8524ce4233b63211e29acbcb6739ec340cd1d2513865cec96c11a00c99ec0cd"
     },
     {
       "path": "test/persistent-service.test.ts",

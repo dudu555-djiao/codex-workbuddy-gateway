@@ -9,16 +9,22 @@ import { fileURLToPath } from "node:url";
 
 const execute = promisify(execFile);
 const ROOT_FILES = new Set(["README.md", ".gitignore", ".env.example", "package.json", "package-lock.json", "tsconfig.json", "LICENSE"]);
-const SKILL_FILES = ["skills/workbuddy-executor/SKILL.md", "skills/workbuddy-executor/agents/openai.yaml", "skills/workbuddy-executor/references/setup.md"];
-const REQUIRED_FILES = ["README.md", ".env.example", "package.json", "package-lock.json", "tsconfig.json", "src/server.ts", "dist/server.js", "bin/workbuddy-gateway", "bin/workbuddy-worker", "dist/desktop-worker-cli.js", "bin/workbuddy-service", "src/persistent-service.ts", "src/service-cli.ts", "src/native-desktop-trigger.ts", "dist/persistent-service.js", "dist/service-cli.js", "dist/native-desktop-trigger.js", "docs/QUEUE_WORKER.md", "scripts/install-skill.mjs", ...SKILL_FILES];
+const SKILLS = new Map([
+  ["workbuddy-executor", ["skills/workbuddy-executor/SKILL.md", "skills/workbuddy-executor/agents/openai.yaml", "skills/workbuddy-executor/references/setup.md"]],
+  ["deepseek-executor", ["skills/deepseek-executor/SKILL.md", "skills/deepseek-executor/references/setup.md"]],
+]);
+const SKILL_FILES = [...SKILLS.values()].flat();
+const PLUGIN_FILES = ["index.mjs", "adapter.mjs", "events.mjs", "transport.mjs", "package.json", "cordis.patch.yml", "README.md", "test/adapter.test.mjs", "test/events.test.mjs", "test/transport.test.mjs"].map(name => `deepseek-plugin/${name}`);
+const REQUIRED_FILES = ["README.md", ".env.example", "package.json", "package-lock.json", "tsconfig.json", "src/server.ts", "dist/server.js", "bin/workbuddy-gateway", "bin/workbuddy-worker", "dist/desktop-worker-cli.js", "bin/workbuddy-service", "src/persistent-service.ts", "src/service-cli.ts", "src/native-desktop-trigger.ts", "dist/persistent-service.js", "dist/service-cli.js", "dist/native-desktop-trigger.js", "docs/QUEUE_WORKER.md", "scripts/install-skill.mjs", "bin/deepseek-gateway", "src/deepseek-server.ts", "dist/deepseek-server.js", "src/deepseek-client.ts", "src/deepseek-store.ts", "src/deepseek-coordinator.ts", "src/deepseek-evidence.ts", "dist/deepseek-client.js", "dist/deepseek-store.js", "dist/deepseek-coordinator.js", "dist/deepseek-evidence.js", "scripts/install-deepseek-skill.mjs", "scripts/install-deepseek-plugin.mjs", "scripts/deepseek-call.mjs", "docs/DEEPSEEK.md", ...SKILL_FILES, ...PLUGIN_FILES];
 const DIRECTORY_RULES = new Map([
   ["src", /\.ts$/],
   ["test", /\.test\.ts$/],
-  ["docs", /^(?:video-explanation|FAILURE_REVIEW|USER_ACCEPTANCE|CODEX_WORKFLOW|QUEUE_WORKER)\.md$/],
-  ["scripts", /^(?:package|install-skill)\.mjs$/],
-  ["bin", /^workbuddy-(?:gateway|cli|doctor|worker|service)$/],
+  ["docs", /^(?:video-explanation|FAILURE_REVIEW|USER_ACCEPTANCE|CODEX_WORKFLOW|QUEUE_WORKER|DEEPSEEK)\.md$/],
+  ["scripts", /^(?:package|install-skill|install-deepseek-skill|install-deepseek-plugin|deepseek-call)\.mjs$/],
+  ["bin", /^(?:workbuddy-(?:gateway|cli|doctor|worker|service)|deepseek-gateway)$/],
   ["dist", /\.(?:js|js\.map)$/],
   ["skills", /^(?:SKILL\.md|openai\.yaml|setup\.md)$/],
+  ["deepseek-plugin", /./],
 ]);
 const PRIVATE_DIRS = new Set(["data", "outputs", "node_modules", "work", "logs", ".git", ".workbuddy", ".codex"]);
 
@@ -27,17 +33,20 @@ function allowed(relative) {
   if (segments.some((segment) => PRIVATE_DIRS.has(segment))) return false;
   if (segments.length === 1) return ROOT_FILES.has(relative);
   if (segments[0] === "skills") return SKILL_FILES.includes(relative);
+  if (segments[0] === "deepseek-plugin") return PLUGIN_FILES.includes(relative);
   const rule = DIRECTORY_RULES.get(segments[0]);
   if (!rule || segments.slice(1).some((segment) => segment.startsWith("."))) return false;
   return rule.test(segments.at(-1));
 }
 
 /** A standalone skill archive contains instructions only, never a live MCP configuration. */
-export async function createSkillPackage(sourceDir, outputDir, version) {
+export async function createSkillPackage(sourceDir, outputDir, version, skillName = "workbuddy-executor") {
   if (!/^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?$/.test(version)) throw new Error("Release version must be a safe semantic version.");
+  const skillFiles = SKILLS.get(skillName);
+  if (!skillFiles) throw new Error("Unknown distributable skill");
   sourceDir = path.resolve(sourceDir);
   outputDir = path.resolve(outputDir);
-  const archive = path.join(outputDir, `workbuddy-executor-v${version}.zip`);
+  const archive = path.join(outputDir, `${skillName}-v${version}.zip`);
   const checksum = `${archive}.sha256`;
   await fs.mkdir(outputDir, { recursive: true });
   for (const filename of [archive, checksum]) {
@@ -46,7 +55,7 @@ export async function createSkillPackage(sourceDir, outputDir, version) {
   }
   const stage = await fs.mkdtemp(path.join(os.tmpdir(), "workbuddy-skill-release-"));
   try {
-    for (const relative of SKILL_FILES) {
+    for (const relative of skillFiles) {
       const filename = path.join(sourceDir, relative);
       if (!(await fs.lstat(filename)).isFile()) throw new Error(`Expected regular skill file: ${relative}`);
       const content = await fs.readFile(filename);
@@ -55,10 +64,10 @@ export async function createSkillPackage(sourceDir, outputDir, version) {
       await fs.mkdir(path.dirname(target), { recursive: true });
       await fs.writeFile(target, content, { mode: 0o644 });
     }
-    await execute("zip", ["-q", "-r", "-X", archive, "workbuddy-executor"], { cwd: stage });
+    await execute("zip", ["-q", "-r", "-X", archive, skillName], { cwd: stage });
     const digest = crypto.createHash("sha256").update(await fs.readFile(archive)).digest("hex");
     await fs.writeFile(checksum, `${digest}  ${path.basename(archive)}\n`, { flag: "wx" });
-    return { archive, checksum, files: SKILL_FILES.length, sha256: digest };
+    return { archive, checksum, files: skillFiles.length, sha256: digest };
   } catch (error) {
     await Promise.all([archive, checksum].map((filename) => fs.rm(filename, { force: true })));
     throw error;
@@ -151,5 +160,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const outputDir = process.argv[2] ? path.resolve(process.argv[2]) : path.join(sourceDir, "outputs", "release");
   const result = await createPackage(sourceDir, outputDir, pkg.version);
   const skill = await createSkillPackage(sourceDir, outputDir, pkg.version);
-  console.log(JSON.stringify({ project: result, skill }, null, 2));
+  const deepseekSkill = await createSkillPackage(sourceDir, outputDir, pkg.version, "deepseek-executor");
+  console.log(JSON.stringify({ project: result, skill, deepseekSkill }, null, 2));
 }

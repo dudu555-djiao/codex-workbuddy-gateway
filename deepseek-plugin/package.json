@@ -1,0 +1,15 @@
+{
+  "name": "@codex-local/dsh-codex-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Private local RPC adapter for the existing DeepSeek Harness Desktop/Web Host.",
+  "main": "index.mjs",
+  "exports": { ".": "./index.mjs", "./package.json": "./package.json" },
+  "files": ["index.mjs", "events.mjs", "transport.mjs", "adapter.mjs", "cordis.patch.yml", "README.md"],
+  "scripts": { "test": "node --test test/*.test.mjs" },
+  "engines": { "node": ">=22.13.0" },
+  "peerDependencies": { "@deepseek-ai/dsh-api-session-controller": "0.2.0-rc.2" },
+  "peerDependenciesMeta": { "@deepseek-ai/dsh-api-session-controller": { "optional": true } },
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}

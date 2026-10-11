@@ -1,0 +1,4 @@
+- insert:
+    - id: codex-deepseek-bridge
+      name: '@codex-local/dsh-codex-bridge'
+      config: {}
