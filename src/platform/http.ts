@@ -46,6 +46,15 @@ export function createHubServer(engine: HubEngine, token: string) {
       const segments = url.pathname.split("/").filter(Boolean).map(item => decodeURIComponent(item));
       if (req.method === "GET" && url.pathname === "/v1/health") { json(res, 200, { status: "ok", version: "0.7.0", maxConcurrent: engine.maxConcurrent, capacityScope: "platform_runs", creditUsage: "unavailable" }); return; }
       if (req.method === "GET" && url.pathname === "/v1/providers") { json(res, 200, { providers: await engine.describeProviders() }); return; }
+      if(segments[0]==='v1'&&segments[1]==='providers'&&segments[2]&&segments.length===4){
+        const provider=engine.provider(segments[2]);
+        if(req.method==='GET'&&segments[3]==='models'&&provider.models){json(res,200,await provider.models(url.searchParams.get('sessionId')??undefined));return;}
+        if(req.method==='GET'&&segments[3]==='workspaces'&&provider.workspaces){json(res,200,await provider.workspaces());return;}
+        if(req.method==='POST'&&segments[3]==='workspaces'&&provider.bindWorkspace){
+          const input=z.object({workspace:z.string().min(1),sessionId:z.string().trim().min(1).optional(),model:z.string().trim().min(1).optional(),title:z.string().min(1).max(200).optional()}).strict().parse(await body(req));
+          json(res,200,await engine.exclusive(()=>provider.bindWorkspace!(input)));return;
+        }
+      }
       if (url.pathname === "/v1/runs" && req.method === "POST") { const result = engine.submit(await body(req)); json(res, result.created ? 202 : 200, result); return; }
       if (url.pathname === "/v1/runs" && req.method === "GET") { json(res, 200, { runs: engine.store.list(Math.min(cursor(url.searchParams.get("limit")) || 50, 100), cursor(url.searchParams.get("offset"))) }); return; }
       if (segments[0] !== "v1" || segments[1] !== "runs" || !segments[2]) throw new HubError("NOT_FOUND", "Unknown endpoint", 404);
@@ -87,7 +96,7 @@ export function createHubServer(engine: HubEngine, token: string) {
       if (req.method === "POST" && segments.length === 4) {
         const raw = await body(req);
         if (action === "cancel") { z.object({}).strict().parse(raw); json(res, 200, await engine.cancel(id)); return; }
-        if (action === "rework") { const input = z.object({ feedback: z.string().trim().min(1).max(100_000) }).strict().parse(raw); json(res, 202, await engine.rework(id, input.feedback)); return; }
+        if (action === "rework") { const input = z.object({ feedback: z.string().trim().min(1).max(100_000), model:z.string().trim().min(1).optional() }).strict().parse(raw); json(res, 202, await engine.rework(id, input.feedback,input.model)); return; }
         if (action === "accept") { const input = z.object({ note: z.string().trim().min(1).max(4000), evidence: z.array(z.string().trim().min(1).max(4000)).min(1).max(100) }).strict().parse(raw); json(res, 200, await engine.accept(id, input)); return; }
       }
       throw new HubError("NOT_FOUND", "Unknown endpoint or method", 404);

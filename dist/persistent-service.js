@@ -245,12 +245,12 @@ export class PersistentDesktopService {
             return this.result("deadline_passed", identity);
         if (this.unresolvedLease())
             return this.result("active_lease", identity);
-        if (new DesktopQueue(this.config).listeners().some((listener) => listener.sessionId === this.registration.sessionId))
-            return this.result("listener_ready", identity);
         const evidence = readDesktopSession(this.config.workbuddyConfigDir, this.registration.sessionId);
         if (!evidence.registered)
             return this.result("unavailable", { ...identity, reason: evidence.reason });
         const request = journal.request();
+        const modelReady = () => { if (request.model)
+            writePrivateJson(path.join(journal.dir, 'model-ready.json'), { model: request.model, sessionId: this.registration.sessionId, attemptId: journal.attemptId }); };
         if (request.sessionId !== this.registration.sessionId || (request.workspace && path.resolve(request.workspace) !== this.registration.workspace) || (task.workspace && path.resolve(task.workspace) !== this.registration.workspace) || (evidence.cwd && path.resolve(evidence.cwd) !== this.registration.workspace)) {
             return this.result("binding_mismatch", { ...identity, reason: "The registered workspace or session no longer matches the queued task" });
         }
@@ -259,12 +259,15 @@ export class PersistentDesktopService {
         if (previous && (previous.sessionId !== this.registration.sessionId || previous.attemptId !== journal.attemptId))
             throw new Error("Wake intent identity does not match its queue attempt");
         if (previous && previous.state !== "rejected") {
-            if (previous.state === "submitted")
+            if (previous.state === "submitted") {
+                modelReady();
                 return this.result("wake_pending", { ...identity, wakeId: previous.wakeId });
+            }
             if (this.trigger.findWake) {
                 try {
                     if (await this.trigger.findWake(this.registration.sessionId, previous.wakeId)) {
                         writeWakeIntent(intentFile, { ...previous, state: "submitted", updatedAt: new Date().toISOString() });
+                        modelReady();
                         return this.result("wake_pending", { ...identity, wakeId: previous.wakeId });
                     }
                 }
@@ -272,6 +275,8 @@ export class PersistentDesktopService {
             }
             return this.result("wake_uncertain", { ...identity, wakeId: previous.wakeId, reason: previous.error ?? "Native wake submission has not been confirmed; inspect the original desktop conversation before retrying" });
         }
+        if (new DesktopQueue(this.config).listeners().some((listener) => listener.sessionId === this.registration.sessionId))
+            return this.result("listener_ready", identity);
         const native = await this.trigger.inspect(this.registration.sessionId);
         if (native.state === "offline")
             return this.result("unavailable", { ...identity, reason: native.reason });
@@ -291,8 +296,14 @@ export class PersistentDesktopService {
         writeWakeIntent(intentFile, intent);
         const prompt = `[CODEX_QUEUE_WAKE ${intent.wakeId}]\n${new DesktopQueue(this.config).prepare(this.registration.sessionId, false, true).prompt}`;
         try {
-            const response = await this.trigger.wakeIdle(this.registration.sessionId, intent.wakeId, prompt);
+            const response = await this.trigger.wakeIdle(this.registration.sessionId, intent.wakeId, prompt, request.model);
             writeWakeIntent(intentFile, { ...intent, state: response.accepted ? "submitted" : "rejected", receipt: response.receipt, updatedAt: new Date().toISOString() });
+            if (response.accepted)
+                modelReady();
+            if (response.error) {
+                journal.save({ ...journal.snapshot(), status: 'blocked', stopReason: 'model_configuration_rejected', error: response.error });
+                journal.append('result', `TASK_STATUS: blocked\n${response.error}`, { status: 'blocked', blockedReason: response.error, sessionId: this.registration.sessionId });
+            }
             return this.result(response.accepted ? "wake_submitted" : "wake_rejected", { ...identity, wakeId: intent.wakeId });
         }
         catch (error) {

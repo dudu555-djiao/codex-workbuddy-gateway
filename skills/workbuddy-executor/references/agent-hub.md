@@ -46,4 +46,19 @@ workspace 须是已有的绝对目录，原生会话自动创建或复用；独�
 - 已完成实际内容检查：`agent_hub_accept({id,note:"检查结论",evidence:["具体检查、输入或产物与预期结果"]})`。该接口只记录独立验收，不执行检查；用户自行验收时保留 review=pending。
 - cancel_requested / uncertain / blocked 且 holdsCapacity=true：确认原执行是否已停止。取消是协作请求，不回滚既有操作。不自动重发未知任务，也不通过新建任务绕过占位；首期没有一键强制释放。
 
-Codex 不代写委派成果并归为 WorkBuddy。平台运行、排队或服务心跳均不能代替真实执行证据。当前不支持调用时换模型、读取积分余额与逐任务扣费、完整工具轨迹、多账号或公网访问。DeepSeek Harness 和 qodex 尚未加入统一适配器。
+Codex 不代写委派成果并归为 WorkBuddy。平台运行、排队或服务心跳均不能代替真实执行证据。支持调用时指定原生模型，以及更换项目绑定；仍不支持读取积分余额与逐任务扣费、完整工具轨迹、多账号或公网访问。DeepSeek Harness 和 qodex 尚未加入统一适配器。
+
+## 模型与会话绑定
+
+先调用 `agent_hub_models({sessionId?})`，从 models 中选择实际 ID。`agent_hub_submit` 可额外传 `model`、`sessionId`；指定 sessionId 时同时传该会话的真实 workspace。省略 model 沿用原生会话选择，指定时在下一次原生唤醒前配置并核对。
+
+`agent_hub_workspaces({})` 查看已登记项目；`agent_hub_bind_workspace({workspace,sessionId?,model?})` 创建/复用或更换同目录会话绑定及默认模型。更换模型要求会话原生空闲且没有排队或未闭合任务；可以选择另一空闲同目录会话。已派出的任务及返工不迁移会话。返工选其他模型使用 `agent_hub_rework({id,feedback,model})`。
+
+旧对话工具未刷新可调用：
+
+```sh
+node /absolute/agent-hub/scripts/agent-hub-call.mjs agent_hub_models '{}'
+node /absolute/agent-hub/scripts/agent-hub-call.mjs agent_hub_bind_workspace @binding.json
+```
+
+CLI 对应 `agent-hub models [sessionId]`、`agent-hub workspaces`、`agent-hub bind @binding.json`；SDK 对应 `hub.models(sessionId?)`、`hub.workspaces()`、`hub.bindWorkspace({workspace,sessionId?,model?})`。模型 ID 包含已在 WorkBuddy 配置的自定义模型，不能据此承诺额度或某模型必定能执行成功。

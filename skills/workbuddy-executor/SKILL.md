@@ -1,6 +1,6 @@
 ---
 name: workbuddy-executor
-description: 用户要求将任务交给桌面 WorkBuddy 执行、接收反馈、返工或验收时使用。优先通过 Agent Hub 统一入口调用，兼容已有 workbuddy MCP 任务；支持各项目独立目录和原生会话。纯原理问答或普通 Codex 自己执行的任务不触发。
+description: 用户要求将任务交给桌面 WorkBuddy 执行、接收反馈、返工或验收时使用。优先通过 Agent Hub 统一入口调用，兼容已有 workbuddy MCP 任务；支持各项目独立目录、原生会话、模型选择与绑定切换。纯原理问答或普通 Codex 自己执行的任务不触发。
 ---
 
 # WorkBuddy 执行官
@@ -23,7 +23,15 @@ Codex 负责派工、必要核对和返工；真实桌面 WorkBuddy 使用自己
 - 先恢复已知 taskId；丢失编号才用 `workbuddy_list_tasks` 的小 limit。已有任务 `working` 时继续等待，不因当时没有等待中的监听器而重启或重发。
 - 无已知执行中任务的首次使用检查一次 `workbuddy_health`；需要选择项目时用 `workbuddy_list_workspaces`，不要随意取最新历史 ID。持久模式核对服务的 `workers` 及对应目录状态；`ready` / `online` 仍是 helper 等待语义，不能仅凭 false 判服务失效。记住 sessionId/workspace，之后不反复 health。断线不重派目标；创建结果不确定也不重复创建，核对已预留的真实会话 ID。
 - 旧对话尚未加载新增工具时，可用完整项目的 `scripts/workbuddy-call.mjs` 调用同名工具（JSON 或 @参数文件）；其启动器加载本机 .env 并复用同一任务库。不要因工具未刷新退回要求用户手动开会话。明确使用旧 Gateway 或临时监听时，才按连接步骤的兼容流程处理。
-- 队列仅 `sessionMode: existing`，workspace 必须匹配真实会话目录，不传 `model`。模型由用户在 WorkBuddy 选择。
+- 队列仅 `sessionMode: existing`，workspace 必须匹配真实会话目录。模型可通过原生接口切换，先查询实际可用 ID，不按展示名猜测。模型和绑定操作见下文；省略 model 时沿用会话当前设置。
+
+## 模型选择与绑定切换
+
+- 新 Gateway 支持 `agent_hub_models({sessionId?})` / `workbuddy_list_models({sessionId?,detail:"brief"})`，返回实际可用模型 ID（包括原生已配置的自定义模型）和可选会话的当前模型。不新增账号、凭据或自定义提供商。
+- 指定本次任务模型：Hub 的 `agent_hub_submit` 或直连 `workbuddy_send_task` 传 `model:"实际模型ID"`；模型在该会话下一次原生唤醒时配置并读回核对，旧监听不能领取尚未准备好模型的任务。无效模型会阻塞并回报原因，不静默替换。临时监听不足以执行带 model 的队列任务，需要完整持久服务。
+- 更换项目绑定或默认模型：先用 `agent_hub_workspaces` / `workbuddy_list_workspaces` 查看绑定；调用 `agent_hub_bind_workspace({workspace,sessionId?,model?})` 或 `workbuddy_ensure_workspace({workspace,sessionId?,model?})`。sessionId 指向该目录的真实会话，省略时创建或复用；model 省略时保留当前模型。原生核对模型成功后才替换已有绑定；有排队或未闭合任务、原生忙碌时，先等待，或绑定另一个空闲的同目录会话。
+- 更换绑定只影响后续派工，已经派出的任务及返工仍使用原会话。返工换模型可传 `agent_hub_rework({id,feedback,model})` / `workbuddy_continue_task({taskId,feedback,model})`，必须先确认上轮结束。Hub 返工省略 model 沿用该任务先前指定值；直连省略时用原会话当前值。
+- 工具尚未刷新时，使用完整项目的 `scripts/agent-hub-call.mjs` / `scripts/workbuddy-call.mjs` 调用新工具；旧 Gateway 需更新完整程序，不能只换 Skill。模型列表可见不保证账户额度与本轮调用成功。
 
 ## 兼容直连：派工
 

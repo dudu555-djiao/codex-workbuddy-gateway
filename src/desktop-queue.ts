@@ -96,7 +96,6 @@ export class DesktopQueue {
     const evidence = readDesktopSession(this.config.workbuddyConfigDir, sessionId);
     if (!evidence.registered) throw new Error(evidence.reason ?? "WorkBuddy desktop session is unregistered");
     if (request.workspace && evidence.cwd && path.resolve(request.workspace) !== path.resolve(evidence.cwd)) throw new Error("The task workspace differs from the dedicated desktop worker session");
-    if (request.model) throw new Error("Queue tasks use the model selected in the WorkBuddy desktop conversation. Select and verify the model there; queue dispatch cannot switch it remotely.");
     const journal = new RunJournal(this.root, request.attemptId);
     fs.mkdirSync(journal.dir, { recursive: true, mode: 0o700 });
     fs.writeFileSync(path.join(journal.dir, "request.json"), JSON.stringify({ ...request, sessionId }), { flag: "wx", mode: 0o600 });
@@ -121,6 +120,12 @@ export class DesktopQueue {
           const snapshot = journal.snapshot();
           if (!snapshot || snapshot.driver !== "desktop-queue" || snapshot.status !== "queued" || snapshot.sessionId !== sessionId || journal.cancellationRequested()) continue;
           const request = journal.request();
+          // An old listener must not take a task requiring a different native model.
+          // The wake service authorizes only this attempt after native configuration and receipt.
+          if(request.model){
+            const ready=readJson<{model:string;sessionId:string;attemptId:string}>(path.join(journal.dir,'model-ready.json'));
+            if(ready?.model!==request.model||ready.sessionId!==sessionId||ready.attemptId!==task.attemptId)continue;
+          }
           const claimed = locked(path.join(this.root, "queue-session-locks", `${key(sessionId)}.lock`), () => {
             const bindingFile = path.join(this.root, "queue-session-locks", `${key(sessionId)}.active.json`);
             const active = readJson<{attemptId: string}>(bindingFile);

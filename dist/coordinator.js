@@ -30,7 +30,7 @@ export class TaskCoordinator {
             return { ok: true, created: false, task: previous, message: "Task already exists; no second prompt was dispatched. Use get/wait or continue after review." };
         if (input.workspace && (!path.isAbsolute(input.workspace) || !fs.statSync(input.workspace).isDirectory()))
             throw new Error("workspace must be an existing absolute directory");
-        if (this.config.backend === "desktop-queue" && !input.model && input.sessionMode !== 'new') {
+        if (this.config.backend === "desktop-queue" && input.sessionMode !== 'new') {
             const registration = readServiceRegistration(this.config.serviceConfigFile ?? path.join(path.dirname(this.config.dbFile), "persistent-service.json"));
             if (registration && path.resolve(registration.dbFile) === path.resolve(this.config.dbFile)) {
                 if (!input.workspace && !input.sessionId && new Set(readWorkspaceWorkers(this.config, registration).filter(worker => worker.selected).map(worker => worker.workspace)).size > 1)
@@ -57,8 +57,6 @@ export class TaskCoordinator {
         // A reservation is not execution provenance. The actual worker supplies it.
         this.store.updateAttempt(task.taskId, attemptId, { runtimeSource: null });
         try {
-            if (this.config.backend === 'desktop-queue' && input.model)
-                throw new Error("Queue tasks use the model selected in WorkBuddy; remote model changes are not supported");
             if (this.config.backend === 'desktop-queue' && input.sessionMode === 'new')
                 throw new Error("Use workspace or ensure_workspace for native project routing; sessionMode:new is not supported by the queue");
             await this.client.sendMessage(prompt, task.workspace, input.timeoutSeconds, input.sessionId ?? task.sessionId, { taskId: task.taskId, attemptId, model: input.model, sessionMode: input.sessionMode });

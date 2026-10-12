@@ -5,13 +5,13 @@ import { TaskStore } from "../task-store.js";
 import { TaskCoordinator } from "../coordinator.js";
 import { WorkBuddyClient, messageText } from "../workbuddy-client.js";
 import { RunJournal, runsDirectory } from "../run-journal.js";
-import { workerRegistration } from "../workspace-manager.js";
+import { workerRegistration, listModels, listWorkspaces, ensureWorkspace } from "../workspace-manager.js";
 import { HubError, type AgentProvider, type HubRun, type ProviderSnapshot } from "./contracts.js";
 
 export class WorkBuddyProvider implements AgentProvider {
   readonly id = "workbuddy";
   readonly label = "WorkBuddy";
-  readonly capabilities = { outputs: ["text", "json", "artifacts"], execution: "native-desktop", sessionIsolation: "project", modelSelection: false, creditUsage: false, cancellation: "cooperative", fullToolTrace: false };
+  readonly capabilities = { outputs: ["text", "json", "artifacts"], execution: "native-desktop", sessionIsolation: "project", modelSelection: true, workspaceBinding: true, creditUsage: false, cancellation: "cooperative", fullToolTrace: false };
   readonly store: TaskStore;
   readonly client: WorkBuddyClient;
   readonly coordinator: TaskCoordinator;
@@ -22,6 +22,9 @@ export class WorkBuddyProvider implements AgentProvider {
     this.coordinator = new TaskCoordinator(config, this.store, this.client);
   }
   close() { this.store.close(); }
+  models(sessionId?:string){return listModels(this.config,sessionId);}
+  workspaces(){return {ok:true,workers:listWorkspaces(this.config)};}
+  bindWorkspace(input:{workspace:string;sessionId?:string;model?:string;title?:string}){return ensureWorkspace(this.config,input);}
   async health() {
     let message = "First submitted workspace will be prepared automatically. WorkBuddy login and permissions must be valid.";
     let state = "needs_setup";
@@ -42,7 +45,7 @@ export class WorkBuddyProvider implements AgentProvider {
   }
   async submit(run: HubRun) {
     let response;
-    try { response = await this.coordinator.send({ taskId: run.providerTaskId, workspace: run.workspace, objective: this.instructions(run), constraints: run.input.constraints, timeoutSeconds: Math.max(1, Math.ceil((Date.parse(run.deadline) - Date.now()) / 1000)) }); }
+    try { response = await this.coordinator.send({ taskId: run.providerTaskId, workspace: run.workspace, sessionId:run.input.sessionId, model:run.input.model, objective: this.instructions(run), constraints: run.input.constraints, timeoutSeconds: Math.max(1, Math.ceil((Date.parse(run.deadline) - Date.now()) / 1000)) }); }
     catch (error) {
       // The coordinator reserves TaskStore before it can submit a task. Native
       // workspace preparation alone does not execute the user's objective.
@@ -65,7 +68,7 @@ export class WorkBuddyProvider implements AgentProvider {
     if (task) this.client.cancel(task.messageId);
   }
   async rework(run: HubRun) {
-    const response = await this.coordinator.continue({ taskId: run.providerTaskId, feedback: `${run.feedback}\n\n${this.instructions(run)}`, timeoutSeconds: Math.max(1, Math.ceil((Date.parse(run.deadline) - Date.now()) / 1000)) });
+    const response = await this.coordinator.continue({ taskId: run.providerTaskId, model:run.input.model, feedback: `${run.feedback}\n\n${this.instructions(run)}`, timeoutSeconds: Math.max(1, Math.ceil((Date.parse(run.deadline) - Date.now()) / 1000)) });
     if (!response.ok) throw new Error(response.error ?? "WorkBuddy rework was blocked");
   }
   async accept(run: HubRun, input: { note: string; evidence: string[] }) {

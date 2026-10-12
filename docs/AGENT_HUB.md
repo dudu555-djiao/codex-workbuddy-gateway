@@ -121,6 +121,16 @@ cancel_requested 表示已请求停止，未确认停止前继续占用平台并
 
 平台记录、令牌、自动目录和分轮次结果默认在 data/platform/；原生任务继续进入现有任务库和 data/runs/。这些目录不参与 Git 和发布打包。文件下载只允许该任务工作目录及本轮结果目录，拒绝越界的符号链接。
 
-积分余额和逐任务消耗均为 null/unavailable，不能将未知视为零消耗。未验证免费积分的具体扣减归属，也未接入计费或自动购买。当前桌面通道使用 WorkBuddy 原生选定模型，不支持调用时切换。项目会话会复用，尚无自动轮换和上下文成本管理。事件来自执行器主动回报，不能保证完整工具轨迹。
+积分余额和逐任务消耗均为 null/unavailable，不能将未知视为零消耗。未验证免费积分的具体扣减归属，也未接入计费或自动购买。当前桌面通道支持指定原生 model ID，并在原生唤醒前配置和读回核对；省略时使用 WorkBuddy 会话当前模型。项目会话会复用，尚无自动轮换和上下文成本管理。事件来自执行器主动回报，不能保证完整工具轨迹。
 
 首期没有公网访问、多账号托管、OpenAI 兼容推理 API，也不把 WorkBuddy、DeepSeek Harness 或 qodex 的能力视为等价。接入新的执行器实现 AgentProvider 并注册到 HubEngine 即可；各执行器仍必须验证登录、真实来源、输出、取消和额度语义。
+
+## 模型与绑定接口
+
+- MCP：`agent_hub_models({sessionId?})` 查询当前可用模型；`agent_hub_workspaces({})` 查看绑定；`agent_hub_bind_workspace({workspace,sessionId?,model?,title?})` 创建、复用或切换同目录真实会话与默认模型。
+- HTTP：`GET /v1/providers/workbuddy/models`（可选 sessionId 查询参数）；`GET /v1/providers/workbuddy/workspaces`；`POST /v1/providers/workbuddy/workspaces` 接受上述绑定 JSON。
+- SDK：`hub.models(sessionId?)`、`hub.workspaces()`、`hub.bindWorkspace({workspace,sessionId?,model?,title?})`；CLI：`agent-hub models [sessionId]`、`agent-hub workspaces`、`agent-hub bind @binding.json`。
+- submit 可额外传 model、sessionId。指定 sessionId 时必须同时提供其真实 workspace；模型 ID 从实时列表选择，不用展示名猜测。包括已在 WorkBuddy 配置的自定义模型，不新增提供商或凭据。
+- `hub.rework(id, feedback, model?)` / `agent_hub_rework` 的可选 model 指定下一轮模型；省略沿用任务之前指定值。返工保持原会话。
+
+绑定中的模型变更要求原生空闲且没有排队或未闭合任务；更换绑定只影响后续派工，已派出的任务和返工继续原会话。单次任务的 model 在其下一次原生唤醒时配置，领取权限按执行轮次保存；旧监听不能抢领另一模型任务。模型无效或配置核对失败时阻塞回报，不静默换模型，也不自动重发未知提交。模型列表可见不保证额度或执行成功。

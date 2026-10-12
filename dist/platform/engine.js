@@ -173,14 +173,16 @@ export class HubEngine {
             return this.get(id);
         });
     }
-    rework(id, feedback) {
+    rework(id, feedback, model) {
         return this.exclusive(async () => {
             const run = this.get(id);
             if (!feedback.trim())
                 throw new HubError("INVALID_FEEDBACK", "Feedback is required");
             if (!run.attemptId || run.holdsCapacity || !["completed", "failed", "blocked"].includes(run.status))
                 throw new HubError("RUN_ACTIVE", "Only a confirmed finished provider attempt may be reworked", 409);
-            return this.store.save({ ...run, status: "queued", review: "pending", holdsCapacity: false, round: run.round + 1, previousAttemptId: run.attemptId, feedback, resultFile: this.resultFile(id, run.round + 1), result: undefined, error: undefined, deadline: new Date(Date.now() + run.input.timeoutSeconds * 1000).toISOString() });
+            if (model !== undefined && !model.trim())
+                throw new HubError('INVALID_MODEL', 'model must be a nonempty native ID');
+            return this.store.save({ ...run, input: model === undefined ? run.input : { ...run.input, model: model.trim() }, status: "queued", review: "pending", holdsCapacity: false, round: run.round + 1, previousAttemptId: run.attemptId, feedback, resultFile: this.resultFile(id, run.round + 1), result: undefined, error: undefined, deadline: new Date(Date.now() + run.input.timeoutSeconds * 1000).toISOString() });
         });
     }
     accept(id, input) {

@@ -25,13 +25,25 @@ export declare class NativeDesktopRpcTrigger implements NativeDesktopTrigger {
     private connect;
     private evaluateConnected;
     private call;
+    listModels(sessionId?: string): Promise<{
+        models: Array<{
+            id: string;
+            name: string;
+        }>;
+        currentModel?: string;
+        sessionId?: string;
+    }>;
+    setModel(sessionId: string, model: string): Promise<{
+        sessionId: string;
+        model: string;
+    }>;
     createWorker(workspace: string, sessionId: string, title?: string): Promise<{
         sessionId: string;
         workspace: string;
     }>;
     inspect(sessionId: string): ReturnType<NativeDesktopTrigger["inspect"]>;
     findWake(sessionId: string, wakeId: string): Promise<boolean>;
-    wakeIdle(sessionId: string, wakeId: string, prompt: string): ReturnType<NativeDesktopTrigger["wakeIdle"]>;
+    wakeIdle(sessionId: string, wakeId: string, prompt: string, model?: string): ReturnType<NativeDesktopTrigger["wakeIdle"]>;
     close(): void;
 }
 export declare function createNativeDesktopTrigger(config: Config, options: {

@@ -39,7 +39,7 @@ workbuddy_ensure_workspace({workspace: "/absolute/project-b"})
 workbuddy_send_task({workspace: "/absolute/project-a", objective: "实际任务及验收条件"})
 ```
 
-`ensure_workspace` 创建或复用专用会话，不执行业务目标。传入同目录已有的 `sessionId` 可选择那个真实会话。选择变化只影响后续派工，旧任务及返工仍保持原会话；旧执行器仍由服务监督。`workbuddy_list_workspaces` 列出目录、会话、选择和原生注册状态。多项目已注册时，派工必须提供 `workspace` 或 `sessionId`，不会悄悄投到旧默认目录。队列仍拒绝远程修改模型；模型沿用 WorkBuddy 设置。
+`ensure_workspace` 创建或复用专用会话，不执行业务目标。传入同目录已有的 `sessionId` 可选择那个真实会话。选择变化只影响后续派工，旧任务及返工仍保持原会话；旧执行器仍由服务监督。`workbuddy_list_workspaces` 列出目录、会话、选择和原生注册状态。多项目已注册时，派工必须提供 `workspace` 或 `sessionId`，不会悄悄投到旧默认目录。支持通过原生接口查询与切换模型：`workbuddy_list_models` 查看实际 ID，`ensure_workspace({workspace,sessionId?,model?})` 切换空闲会话模型与项目绑定；派工可传 model 指定下一次唤醒使用的模型。
 
 其他支持 stdio MCP 的 Agent 可以启动本项目的 `bin/workbuddy-gateway` 并调用相同接口。自己的程序也可使用命令入口（从任意目录调用脚本绝对路径）：
 
@@ -106,7 +106,7 @@ v0.6.0 使用 `ensure_workspace` 原生创建或复用会话，并在首次需�
 
 这不是调用官方本地助手 API，也不是把 WorkBuddy 内置 CLI 当作桌面端。helper 只传递数据，不启动另一个模型，不代写成果。它检查调用进程来自 WorkBuddy 桌面应用，核对声明的会话存在于原生历史，并用每轮独立领取凭证校验回报。会话编号仍需与启动指令所在的真实对话核对；这些检查不等于证明每个回报里的描述都正确。
 
-持久服务在存在待领取任务且专用会话空闲时唤醒它；无任务时只在本机检查队列。正常结束回复后可等待下一次唤醒。已经领取的轮次若因应用崩溃中断，需要检查原会话和已有文件并明确处理，服务不会静默重执行。模型在 WorkBuddy 界面选择；队列路线拒绝远程修改模型。过程消息由 WorkBuddy 主动回报，Codex 仍需独立检查实际文件或来源。
+持久服务在存在待领取任务且专用会话空闲时唤醒它；无任务时只在本机检查队列。正常结束回复后可等待下一次唤醒。已经领取的轮次若因应用崩溃中断，需要检查原会话和已有文件并明确处理，服务不会静默重执行。模型可在 WorkBuddy 界面选择，也可通过原生模型接口查询、配置或按任务指定。过程消息由 WorkBuddy 主动回报，Codex 仍需独立检查实际文件或来源。
 
 ## 配置
 
@@ -161,7 +161,8 @@ v0.6.0 默认直接调用 `workbuddy_ensure_workspace({workspace:"项目绝对�
 
 | 工具 | 用途 |
 | --- | --- |
-| `workbuddy_ensure_workspace` | 按目录原生创建、复用或选择执行会话 |
+| `workbuddy_ensure_workspace` | 按目录原生创建、复用或更换绑定，可配置空闲会话模型 |
+| `workbuddy_list_models` | 查询实际可用模型 ID 及指定会话当前模型 |
 | `workbuddy_list_workspaces` | 列出各项目绑定和当前选择 |
 | `workbuddy_health` | 检查监听器，列出原生历史候选 |
 | `workbuddy_prepare_worker` | 生成选定会话的临时监听或一次性持久安装指令 |
@@ -173,7 +174,7 @@ v0.6.0 默认直接调用 `workbuddy_ensure_workspace({workspace:"项目绝对�
 | `workbuddy_cancel_task` | 请求停止；不保证桌面动作立刻停止 |
 | `workbuddy_respond_task` | ACP 兼容路线的输入响应；队列权限在 WorkBuddy 界面处理 |
 
-同一 `taskId` 重复提交不会重复派工。队列使用 `sessionMode: existing`，传 `workspace` 时先自动准备该目录的会话再派工；若指定 `sessionId`，其原生目录必须匹配。不支持 `model` 参数。默认任务期限 30 分钟，单次 `wait` 最长 55 秒。超时或断线不会自动重发。
+同一 `taskId` 重复提交不会重复派工。队列使用 `sessionMode: existing`，传 `workspace` 时先自动准备该目录的会话再派工；若指定 `sessionId`，其原生目录必须匹配。支持 `model` 参数，使用 `workbuddy_list_models` 返回的实际 ID；服务在下一次原生唤醒前配置并读回验证，旧监听不能抢领未准备好模型的任务。省略 model 沿用会话设置。默认任务期限 30 分钟，单次 `wait` 最长 55 秒。超时或断线不会自动重发。
 
 `queued` 是等待领取，`working` 是领取后执行，`needs_review` 是 WorkBuddy 回报结束，`accepted` 才是 Codex 检查后记录通过。队列与 MCP 重启后可以恢复记录；已安装的持久服务负责原生 WorkBuddy 唤醒，不自动唤醒已经退出的 Codex。
 
@@ -203,3 +204,11 @@ npm run package
 打包白名单包含源码、编译产物、测试、启动器、文档、示例配置、Harness 原生插件及两个 Skill，输出完整项目 ZIP、SHA-256 与文件清单；另输出仅含四份指令文件的 `workbuddy-executor-v版本.zip` 和仅含两份指令文件的 `deepseek-executor-v版本.zip`。独立 Skill 包不包含 MCP 或插件。排除 `.env`、`data/`、日志、会话记录、Cookie、工作成果、其他个人 Skill 和 `node_modules`。打包命令只生成本地文件。打包内容检查不能保证任意未来代码不带隐私，分享前仍应核对文件清单。
 
 保留 `desktop-acp`、`cli`、`gateway` 和官方 `api` 兼容实现作历史用途；桌面监督只接受声明支持的桌面路线。当前 Mac 主路线是任务队列，持久服务在其上提供按需原生唤醒。98 项自动化测试及本轮四项小文件创建、一项返工均通过，覆盖运行中派工、正常重开、完全关闭自动启动与裸启动后自动启用端口。用户登出再登录和系统重启未实测；业务搜索、视频及复杂长任务不在本轮验证范围。WorkBuddy 升级后需重新核对原生 RPC 兼容性，不能保证所有未来版本可用。已有 Codex MCP 进程需重新加载新版。
+
+### 模型选择与项目重新绑定
+
+直连使用 `workbuddy_list_models({sessionId?,detail:"brief"})`；Hub 使用 `agent_hub_models({sessionId?})`。读取 models 中的实际 ID 后，在 `workbuddy_send_task` / `agent_hub_submit` 传 model 即可指定本轮模型，包含已在 WorkBuddy 配置的自定义模型。省略 model 保留会话当前选择。
+
+`workbuddy_ensure_workspace({workspace,sessionId?,model?})` 与 `agent_hub_bind_workspace({workspace,sessionId?,model?})` 可更换同目录真实会话的绑定和默认模型。模型配置要求原生空闲且无排队、未闭合任务；不满足时等待或绑定另一个空闲会话。更换绑定不会迁移已派出任务或返工。返工可通过 `workbuddy_continue_task` / `agent_hub_rework` 的 model 指定新模型。
+
+HTTP：`GET /v1/providers/workbuddy/models?sessionId=...`、`GET /v1/providers/workbuddy/workspaces`、`POST /v1/providers/workbuddy/workspaces`（JSON：workspace、可选 sessionId/model/title）。CLI：`agent-hub models [sessionId]`、`agent-hub workspaces`、`agent-hub bind @binding.json`。完整接口见 [Agent Hub](docs/AGENT_HUB.md)。更新后重新构建、安装 Skill，并在本机服务空闲时重载 Gateway/Hub 服务；只替换 Skill 不会给旧程序增加能力。

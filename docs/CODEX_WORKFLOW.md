@@ -17,7 +17,7 @@ v0.6.0 优先用 `workbuddy_ensure_workspace({workspace:"当前业务项目的�
 1. 打开真实 WorkBuddy 专用对话并发一条普通消息。读取 health 的 `workerCandidates`，按原生工作目录核对会话 ID；候选历史不代表活跃监听器。
 2. 新的持久连接调用 `workbuddy_prepare_worker({sessionId, persistent: true})`，将返回的完整安装 prompt 交给用户一次粘贴到同一个真实 WorkBuddy 会话。WorkBuddy 用自己的 Bash 安装用户级 LaunchAgent；不通过 Computer Use 代粘贴。只生成 prompt 不能报告已安装。
 3. 核对 `bin/workbuddy-service status` 的安装状态和 sessionId/workspace。持久服务在无任务时可以没有等待中的 helper；`health.ready` 仅表示当时正在等任务的 helper。临时模式省略 `persistent: true`，监听结束后须重新粘贴。不要启动隐藏 CLI 或直写原生历史充当桌面对话。
-4. 使用会话实际工作目录，模型在 WorkBuddy 选择；队列仅 `sessionMode: existing`，不带 `model` 参数。
+4. 使用会话实际工作目录，队列仅 `sessionMode: existing`。模型可在 WorkBuddy 选择，也可先 `workbuddy_list_models` 查询实际 ID，再通过 send_task 的 model 指定下一次原生唤醒使用的模型；ensure_workspace 的 sessionId/model 用于更换同目录绑定与空闲会话默认模型。
 5. 先 `list_tasks` 恢复已有目标，不因断线重复投递。
 
 ## 派工和监督

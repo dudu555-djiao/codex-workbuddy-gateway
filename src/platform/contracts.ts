@@ -4,6 +4,8 @@ export const requestSchema = z.object({
   provider: z.string().min(1).max(80).default("workbuddy"),
   task: z.string().trim().min(1).max(100_000),
   workspace: z.string().min(1).optional(),
+  sessionId: z.string().trim().min(1).optional(),
+  model: z.string().trim().min(1).optional(),
   output: z.enum(["text", "json", "artifacts"]).default("text"),
   idempotencyKey: z.string().min(1).max(200).optional(),
   constraints: z.array(z.string().min(1).max(4000)).max(100).default([]),
@@ -39,6 +41,9 @@ export interface AgentProvider {
   cancel(run: HubRun): Promise<void>;
   rework(run: HubRun): Promise<void>;
   accept(run: HubRun, input: { note: string; evidence: string[] }): Promise<void>;
+  models?(sessionId?:string):Promise<unknown>;
+  workspaces?():unknown;
+  bindWorkspace?(input:{workspace:string;sessionId?:string;model?:string;title?:string}):Promise<unknown>;
 }
 export class HubError extends Error {
   constructor(readonly code: string, message: string, readonly httpStatus = 400) { super(message); }

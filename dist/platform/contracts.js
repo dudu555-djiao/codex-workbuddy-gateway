@@ -3,6 +3,8 @@ export const requestSchema = z.object({
     provider: z.string().min(1).max(80).default("workbuddy"),
     task: z.string().trim().min(1).max(100_000),
     workspace: z.string().min(1).optional(),
+    sessionId: z.string().trim().min(1).optional(),
+    model: z.string().trim().min(1).optional(),
     output: z.enum(["text", "json", "artifacts"]).default("text"),
     idempotencyKey: z.string().min(1).max(200).optional(),
     constraints: z.array(z.string().min(1).max(4000)).max(100).default([]),

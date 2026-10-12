@@ -24,10 +24,13 @@ export class AgentHubClient {
         return result;
     }
     submit(input) { return this.request("/v1/runs", "POST", input); }
+    models(sessionId) { return this.request('/v1/providers/workbuddy/models' + (sessionId ? '?sessionId=' + encodeURIComponent(sessionId) : '')); }
+    workspaces() { return this.request('/v1/providers/workbuddy/workspaces'); }
+    bindWorkspace(input) { return this.request('/v1/providers/workbuddy/workspaces', 'POST', input); }
     get(id) { return this.request(`/v1/runs/${encodeURIComponent(id)}`); }
     events(id, after = 0) { return this.request(`/v1/runs/${encodeURIComponent(id)}/events?after=${after}`); }
     cancel(id) { return this.request(`/v1/runs/${encodeURIComponent(id)}/cancel`, "POST", {}); }
-    rework(id, feedback) { return this.request(`/v1/runs/${encodeURIComponent(id)}/rework`, "POST", { feedback }); }
+    rework(id, feedback, model) { return this.request(`/v1/runs/${encodeURIComponent(id)}/rework`, "POST", { feedback, model }); }
     accept(id, note, evidence) { return this.request(`/v1/runs/${encodeURIComponent(id)}/accept`, "POST", { note, evidence }); }
     async wait(id, options = {}) {
         const deadline = Date.now() + (options.timeoutMs ?? 1_800_000);

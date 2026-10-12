@@ -13,6 +13,10 @@ export interface NativeWorkerCreator {
         sessionId: string;
         workspace: string;
     }>;
+    setModel?(sessionId: string, model: string): Promise<{
+        sessionId: string;
+        model: string;
+    }>;
 }
 export declare function readWorkspaceWorkers(config: Config, fallback?: {
     workspace: string;
@@ -37,9 +41,11 @@ export declare class WorkspaceWorkers {
         workspace: string;
         sessionId?: string;
         title?: string;
+        model?: string;
     }, native: NativeWorkerCreator): Promise<{
         created: boolean;
         worker: WorkspaceWorker;
+        model?: string;
     }>;
     close(): void;
 }

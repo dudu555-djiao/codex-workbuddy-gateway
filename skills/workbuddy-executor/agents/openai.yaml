@@ -1,6 +1,6 @@
 interface:
   display_name: "WorkBuddy 执行官"
-  short_description: "通过 Agent Hub 调用桌面 WorkBuddy，支持独立项目、任务恢复和同会话返工"
+  short_description: "通过 Agent Hub 调用桌面 WorkBuddy，支持项目绑定切换、原生模型选择、任务恢复和返工"
   default_prompt: "使用 $workbuddy-executor，通过 Agent Hub 让桌面 WorkBuddy 执行我的任务，核对真实成果并按需返工。"
 dependencies:
   tools:

@@ -12,6 +12,7 @@ export declare class WorkBuddyProvider implements AgentProvider {
         execution: string;
         sessionIsolation: string;
         modelSelection: boolean;
+        workspaceBinding: boolean;
         creditUsage: boolean;
         cancellation: string;
         fullToolTrace: boolean;
@@ -21,6 +22,42 @@ export declare class WorkBuddyProvider implements AgentProvider {
     readonly coordinator: TaskCoordinator;
     constructor(config: Config);
     close(): void;
+    models(sessionId?: string): Promise<{
+        models: Array<{
+            id: string;
+            name: string;
+        }>;
+        currentModel?: string;
+        sessionId?: string;
+        ok: boolean;
+    }>;
+    workspaces(): {
+        ok: boolean;
+        workers: {
+            desktopRegistered: boolean;
+            sessionId: string;
+            workspace: string;
+            state: "creating" | "ready" | "uncertain";
+            selected: boolean;
+            createdAt: string;
+            updatedAt: string;
+            error?: string;
+        }[];
+    };
+    bindWorkspace(input: {
+        workspace: string;
+        sessionId?: string;
+        model?: string;
+        title?: string;
+    }): Promise<{
+        workspace: string;
+        sessionId: string;
+        next: string;
+        created: boolean;
+        worker: import("../workspace-workers.js").WorkspaceWorker;
+        model?: string;
+        ok: boolean;
+    }>;
     health(): Promise<{
         state: string;
         message: string;

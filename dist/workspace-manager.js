@@ -5,6 +5,9 @@ import { readServiceRegistration, registeredServiceConfig } from "./persistent-s
 import { installService } from "./service-cli.js";
 import { WorkspaceWorkers, readWorkspaceWorkers } from "./workspace-workers.js";
 import { readDesktopSession } from "./desktop-runtime.js";
+import { TaskStore } from "./task-store.js";
+import { RunJournal, runsDirectory } from "./run-journal.js";
+import fs from "node:fs";
 export function workerRegistration(config) {
     const file = config.serviceConfigFile ?? path.join(path.dirname(config.dbFile), "persistent-service.json");
     const registration = readServiceRegistration(file);
@@ -22,7 +25,31 @@ export async function ensureWorkspace(config, input) {
     try {
         if (registration)
             workers.seed(registration);
-        const result = await workers.ensure(input, trigger);
+        const result = await workers.ensure(input, {
+            createWorker: (...args) => trigger.createWorker(...args),
+            async setModel(sessionId, model) {
+                // Configuration must not change the model underneath queued or unclosed attempts.
+                const store = new TaskStore(bound.dbFile);
+                try {
+                    for (let offset = 0;; offset += 500) {
+                        const tasks = store.listTasks({ limit: 500, offset });
+                        for (const task of tasks) {
+                            if (task.sessionId !== sessionId || !task.attemptId)
+                                continue;
+                            const journal = new RunJournal(runsDirectory(bound), task.attemptId), snapshot = journal.snapshot();
+                            if (snapshot && (['queued', 'working'].includes(snapshot.status) || (!snapshot.stopReason && fs.existsSync(path.join(journal.dir, 'claim.json')))))
+                                throw new Error('The session has queued or unfinished tasks; wait before changing its bound model, or bind another idle session');
+                        }
+                        if (tasks.length < 500)
+                            break;
+                    }
+                }
+                finally {
+                    store.close();
+                }
+                return trigger.setModel(sessionId, model);
+            },
+        });
         if (!registration) {
             const projectDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
             installService({ config, projectDir, workspace: result.worker.workspace, sessionId: result.worker.sessionId, cdpPort: 18491 });
@@ -31,6 +58,18 @@ export async function ensureWorkspace(config, input) {
     }
     finally {
         workers.close();
+        trigger.close();
+    }
+}
+export async function listModels(config, sessionId) {
+    if (config.backend !== "desktop-queue")
+        throw new Error("Native model discovery requires desktop-queue");
+    const registration = workerRegistration(config), bound = registration ? registeredServiceConfig(config, registration) : config;
+    const trigger = new NativeDesktopRpcTrigger(bound, registration?.cdpPort ?? 18491);
+    try {
+        return { ok: true, ...await trigger.listModels(sessionId) };
+    }
+    finally {
         trigger.close();
     }
 }

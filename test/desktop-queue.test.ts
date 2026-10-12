@@ -56,7 +56,7 @@ test("queue dispatch does not claim provenance; native claim/report survive reco
   assert.equal((await restarted.accept("unit-task", "Unit state-machine verification", ["Verified unit transport report and same session identity"])).state, "accepted");
 });
 
-test("queue rejects wrong leases, sessions, unsupported model changes and overlapping claims", async (t) => {
+test("queue rejects wrong leases, sessions and overlapping claims", async (t) => {
   const f = fixture(t);
   await f.send();
   const claim = await f.queue.claim("unit-session", 0);
@@ -66,7 +66,8 @@ test("queue rejects wrong leases, sessions, unsupported model changes and overla
   await f.send("second-task");
   await assert.rejects(() => f.queue.claim("unit-session", 0), /unfinished queue task/);
   const r = { attemptId: RunJournal.newId(), taskId: "unsupported", prompt: "x", timeoutSeconds: 10, sessionId: "unit-session" };
-  assert.throws(() => f.queue.start({ ...r, model: "different" }), /desktop conversation/);
+  f.queue.start({ ...r, model: "different" });
+  assert.equal(new RunJournal(f.config.runsDir!, r.attemptId).request().model, "different");
   assert.throws(() => f.queue.start({ ...r, sessionMode: "new" }), /dedicated native/);
   assert.throws(() => f.queue.start({ ...r, workspace: path.join(f.dir, "other") }), /workspace differs/);
 });
@@ -125,9 +126,9 @@ test("bootstrap instructions do not pretend to start a worker and preserve quote
 
 test("a rejected queue dispatch remains inspectable and can be corrected without losing its task", async (t) => {
   const f = fixture(t);
-  const rejected = await f.coordinator.send({ taskId: "rejected-model", objective: "Fixture task", workspace: f.dir, sessionId: "unit-session", model: "unavailable-remote-selection" });
+  const rejected = await f.coordinator.send({ taskId: "rejected-mode", objective: "Fixture task", workspace: f.dir, sessionId: "unit-session", sessionMode: "new" });
   assert.equal(rejected.ok, false);
-  assert.equal((await f.coordinator.sync("rejected-model")).state, "blocked");
-  await f.coordinator.continue({ taskId: "rejected-model", feedback: "Use the native desktop model already selected" });
+  assert.equal((await f.coordinator.sync("rejected-mode")).state, "blocked");
+  await f.coordinator.continue({ taskId: "rejected-mode", feedback: "Use the native desktop model already selected" });
   assert.equal((await f.queue.claim("unit-session", 0)).status, "task");
 });

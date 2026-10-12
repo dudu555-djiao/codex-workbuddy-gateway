@@ -12,7 +12,7 @@ import { resultForDetail } from "./brief-result.js";
 import { serviceStatus } from "./service-cli.js";
 import { readServiceRegistration } from "./persistent-service.js";
 import path from "node:path";
-import { ensureWorkspace, listWorkspaces } from "./workspace-manager.js";
+import { ensureWorkspace, listWorkspaces, listModels } from "./workspace-manager.js";
 const config = loadConfig();
 const client = new WorkBuddyClient(config);
 const store = new TaskStore(config.dbFile);
@@ -41,15 +41,16 @@ server.tool("workbuddy_health", "Probe the configured transport. Online means a 
     return { ok: true, backend: config.backend, online: result.online, desktopSupervision: ["desktop-acp", "desktop-queue"].includes(config.backend), ready: result.ready ?? false, sessionId: result.sessionId ?? sessionId ?? persistentService?.sessionId, sessions, persistentService, workerCandidates: config.backend === "desktop-queue" && !bound ? listDesktopSessions(config.workbuddyConfigDir) : undefined, status: result.online ? "transport_online" : serviceAvailable ? (state?.status === "no_task" ? "persistent_service_idle" : "persistent_service_state") : "offline", message: serviceAvailable && !result.online ? (state?.status === "no_task" ? "The persistent service is running. No temporary listener is needed while idle; queued tasks wake enrolled native WorkBuddy chats automatically." : "The persistent service is running; inspect its per-workspace state for active work, blockers or uncertain submission before any retry.") : result.raw.msg, next: persistentService?.installed ? "Pass workspace to send_task to create/reuse its native worker and route automatically. Queued/installed does not prove execution." : "Call ensure_workspace with an existing absolute project directory for native setup without manual chat creation. Login and native permissions remain in WorkBuddy." };
 }, detail));
 server.tool("workbuddy_ensure_workspace", "Create or reuse a dedicated native WorkBuddy session for a project directory without Computer Use or manual chat setup. Optional sessionId selects an existing real session in the same directory. Other projects and queued tasks retain their bindings.", {
-    workspace: z.string().min(1).describe("Existing absolute project directory"), sessionId: z.string().min(1).optional(), title: z.string().min(1).max(200).optional(), detail,
+    workspace: z.string().min(1).describe("Existing absolute project directory"), sessionId: z.string().min(1).optional(), title: z.string().min(1).max(200).optional(), model: z.string().trim().min(1).optional().describe("Optional exact native model ID. Changes require an idle session without queued tasks."), detail,
 }, ({ detail, ...input }) => guard(() => ensureWorkspace(config, input), detail));
+server.tool("workbuddy_list_models", "Query models currently available in WorkBuddy, with optional session's selected model. Use returned IDs for model selection; availability does not prove quota or execution success.", { sessionId: z.string().min(1).optional(), detail }, ({ sessionId, detail }) => guard(() => listModels(config, sessionId), detail));
 server.tool("workbuddy_list_workspaces", "List registered project directories, selected execution sessions and native registration status. An installed worker does not prove task success.", { detail }, ({ detail }) => guard(async () => ({ ok: true, workers: listWorkspaces(config) }), detail));
 server.tool("workbuddy_prepare_worker", "Generate instructions for the selected real desktop chat. persistent:true installs a one-time native auto-wake service; false starts a temporary listener. Read-only: generating a prompt does not install or start anything.", { sessionId: z.string().min(1), persistent: z.boolean().optional().default(false) }, ({ sessionId, persistent }) => guard(async () => ({ ok: true, ...new DesktopQueue(config).prepare(sessionId, persistent) })));
 server.tool("workbuddy_send_task", "Reserve and dispatch a task to a verified WorkBuddy desktop conversation. Repeated taskId never dispatches twice. Keep polling with workbuddy_wait, independently inspect the result, then continue or accept.", {
     taskId: taskId.optional(), objective: z.string().min(1), workspace: z.string().optional().describe("Existing absolute project directory; automatically create or reuse its native WorkBuddy worker when sessionId is omitted."),
     sessionId: z.string().min(1).optional().describe("Real WorkBuddy desktop session ID. Required when several live sessions exist."),
     sessionMode: z.enum(["existing", "new"]).optional().default("existing").describe("Queue uses project routing with existing; pass workspace for automatic native creation or selection. ACP new is version-dependent."),
-    model: z.string().min(1).optional().describe("ACP-only model selection. Queue uses the desktop-selected model and rejects remote model changes."),
+    model: z.string().trim().min(1).optional().describe("Exact model ID from workbuddy_list_models. Queue applies and verifies it at the next native wake; omit to use the session's selected model."),
     constraints: z.array(z.string()).max(30).optional(), acceptanceCommands: z.array(z.string()).max(30).optional(), timeoutSeconds: timeout,
     detail,
 }, ({ detail, ...input }) => guard(() => coordinator.send(input), detail));

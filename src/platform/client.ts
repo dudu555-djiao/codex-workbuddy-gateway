@@ -20,10 +20,13 @@ export class AgentHubClient {
     return result;
   }
   submit(input: RunRequestInput) { return this.request<{ run: HubRun; created: boolean }>("/v1/runs", "POST", input); }
+  models(sessionId?:string){return this.request('/v1/providers/workbuddy/models'+(sessionId?'?sessionId='+encodeURIComponent(sessionId):''));}
+  workspaces(){return this.request('/v1/providers/workbuddy/workspaces');}
+  bindWorkspace(input:{workspace:string;sessionId?:string;model?:string;title?:string}){return this.request('/v1/providers/workbuddy/workspaces','POST',input);}
   get(id: string) { return this.request<HubRun>(`/v1/runs/${encodeURIComponent(id)}`); }
   events(id: string, after = 0) { return this.request<{ events: HubEvent[] }>(`/v1/runs/${encodeURIComponent(id)}/events?after=${after}`); }
   cancel(id: string) { return this.request<HubRun>(`/v1/runs/${encodeURIComponent(id)}/cancel`, "POST", {}); }
-  rework(id: string, feedback: string) { return this.request<HubRun>(`/v1/runs/${encodeURIComponent(id)}/rework`, "POST", { feedback }); }
+  rework(id: string, feedback: string, model?:string) { return this.request<HubRun>(`/v1/runs/${encodeURIComponent(id)}/rework`, "POST", { feedback, model }); }
   accept(id: string, note: string, evidence: string[]) { return this.request<HubRun>(`/v1/runs/${encodeURIComponent(id)}/accept`, "POST", { note, evidence }); }
   async wait(id: string, options: { timeoutMs?: number; signal?: AbortSignal } = {}): Promise<HubRun> {
     const deadline = Date.now() + (options.timeoutMs ?? 1_800_000);

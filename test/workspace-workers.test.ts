@@ -109,10 +109,34 @@ test('one service wakes two project queues while preserving the legacy default a
   assert.equal(JSON.parse(fs.readFileSync(f.config.serviceConfigFile!,'utf8')).sessionId,'legacy');
 });
 
-test('duplicate task IDs return before workspace creation and remote model rejection causes no creation',async t=>{
+test('duplicate IDs never reconfigure a workspace; explicit models are persisted for native wake',async t=>{
   const f=fixture(t),store=new TaskStore(f.config.dbFile);t.after(()=>store.close());let resolved=0;
-  const coordinator=new TaskCoordinator(f.config,store,new WorkBuddyClient(f.config),async()=>{resolved++;throw Error('must not create');});
+  const coordinator=new TaskCoordinator(f.config,store,new WorkBuddyClient(f.config),async(_,input)=>{
+    resolved++;const result=await f.registry.ensure(input,f.creator);
+    return {ok:true,...result,workspace:result.worker.workspace,sessionId:result.worker.sessionId,next:''};
+  });
   store.createOrGet({taskId:'already',messageId:'existing',objective:'old',state:'queued'});
-  const duplicate=await coordinator.send({taskId:'already',objective:'new',workspace:f.b});assert.equal(duplicate.created,false);
-  const invalid=await coordinator.send({objective:'invalid model',workspace:f.b,model:'override'});assert.equal(invalid.ok,false);assert.match(invalid.error!,/remote model/);assert.equal(resolved,0);
+  const duplicate=await coordinator.send({taskId:'already',objective:'new',workspace:f.b,model:'chosen'});assert.equal(duplicate.created,false);assert.equal(resolved,0);
+  const sent=await coordinator.send({objective:'model task',workspace:f.b,model:'chosen'});
+  assert.equal(sent.ok,true);assert.equal(resolved,1);
+  const request=new RunJournal(f.config.runsDir!,sent.task!.attemptId!).request();assert.equal(request.model,'chosen');assert.equal(request.sessionId,f.registry.selected(f.b)!.sessionId);
+});
+
+test('failed model selection does not replace an existing workspace binding',async t=>{
+  const f=fixture(t);f.register('old',f.a);f.register('new',f.a);
+  await f.registry.ensure({workspace:f.a,sessionId:'old'},f.creator);
+  const native={...f.creator,async setModel(){throw Error('unavailable model');}};
+  await assert.rejects(()=>f.registry.ensure({workspace:f.a,sessionId:'new',model:'bad'},native),/unavailable model/);
+  assert.equal(f.registry.selected(f.a)?.sessionId,'old');
+  const selected=await f.registry.ensure({workspace:f.a,sessionId:'new',model:'chosen'},{...f.creator,async setModel(sessionId,model){return {sessionId,model};}});
+  assert.equal(selected.worker.sessionId,'new');assert.equal(selected.model,'chosen');assert.equal(f.registry.list().length,2);
+});
+
+test('slow model configuration cannot overwrite a newer project binding',async t=>{
+  const f=fixture(t);f.register('old',f.a);f.register('new',f.a);
+  await f.registry.ensure({workspace:f.a,sessionId:'old'},f.creator);
+  let resume!:()=>void,entered!:()=>void;const started=new Promise<void>(r=>entered=r),gate=new Promise<void>(r=>resume=r);
+  const slow=f.registry.ensure({workspace:f.a,model:'fast'},{...f.creator,async setModel(sessionId,model){entered();await gate;return{sessionId,model};}});
+  await started;await f.registry.ensure({workspace:f.a,sessionId:'new'},f.creator);resume();
+  await assert.rejects(()=>slow,/selection changed/);assert.equal(f.registry.selected(f.a)?.sessionId,'new');
 });

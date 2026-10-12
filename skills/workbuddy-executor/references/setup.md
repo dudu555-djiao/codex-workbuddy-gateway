@@ -69,7 +69,7 @@ node /path/to/gateway/scripts/workbuddy-call.mjs workbuddy_list_workspaces '{}'
 ## 不一致或阻塞
 
 - 后端为旧 `api`、`gateway`、`cli` 或不适配版本的 `desktop-acp` 时，先如实说明路线差异，不能把隐藏执行器当用户桌面 WorkBuddy。
-- 队列不支持远程选模型，也不能用 `respond_task` 绕过原生权限；新会话通过 v0.6.0 的 `ensure_workspace` 原生创建，不能使用 `sessionMode:new` 代替。权限请求由用户在 WorkBuddy 处理。
+- 队列支持通过 `workbuddy_list_models` 查询原生模型，使用 `ensure_workspace({workspace,sessionId?,model?})` 切换空闲会话模型与项目绑定，或在 `send_task` / `continue_task` 传 model 指定下一轮；不能用 `respond_task` 绕过原生权限；新会话通过 v0.6.0 的 `ensure_workspace` 原生创建，不能使用 `sessionMode:new` 代替。权限请求由用户在 WorkBuddy 处理。
 - MCP 断线用原 taskId 恢复，不重新派相同目标。任务期限届满按 blocked 处理，不自动重发。
 - 已领取轮次因应用崩溃中断、领取未闭合或唤醒提交不确定时，检查原会话、轮次与已有文件，明确阻塞后再决定恢复；服务不能静默重执行。不要把正常退出重开恢复当作中断任务自动重跑的许可。
 - 取消是协作请求，不保证已执行操作回滚。需要确认停下时检查现有状态和必要记录，不操作桌面 UI。

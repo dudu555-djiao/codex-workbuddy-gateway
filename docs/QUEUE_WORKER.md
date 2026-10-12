@@ -69,7 +69,7 @@ bin/workbuddy-service recover --task-id TASK_ID --attempt-id ATTEMPT_ID --reason
 
 该命令通过原生 RPC 确认原会话在原目录空闲，拒绝执行中、等待输入、离线、目录变更和非当前轮次。它保留原 claim、失败记录和产物，只关闭过期租约，并保存 `recovery.json` 审计；不会把任务标为完成，也不派新任务。随后使用 `continue_task` 在同一 taskId/sessionId 建立新轮次，要求 WorkBuddy 核验已有成果并使用新领取凭证回报。旧轮次仍不能回报。本机服务不会自动执行这个恢复步骤。
 
-模型在 WorkBuddy 中选择。队列拒绝远程模型切换和自动新建会话。权限和输入沿用原生 UI；`respond_task` 不为队列绕过桌面授权。取消是协作请求，执行器需要检查并停下，已经写入的文件不会自动回滚。
+模型可在 WorkBuddy 中选择，或通过 workbuddy_list_models 查询后由 ensure_workspace 的 model 配置空闲会话；任务的 model 在下一次原生唤醒前配置和读回核对。旧监听不能领取未完成本轮模型准备的任务。项目会话由 ensure_workspace 原生创建/复用，sessionId 可切换同目录真实会话绑定，已派出任务保持原会话。权限和输入沿用原生 UI；`respond_task` 不为队列绕过桌面授权。取消是协作请求，执行器需要检查并停下，已经写入的文件不会自动回滚。
 
 过程信息是 WorkBuddy 主动填写的回报，桥接器不自动采集完整工具轨迹。`ready` / `online` 仍表示正在等任务的 helper；持久服务安装绑定匹配且心跳有效、暂时没有 helper 时，health 返回 `persistent_service_idle`，这是正常空闲，不需要 bootstrap。绑定生效时省略无关历史候选，只返回服务绑定信息；不同任务库不继承其他库的服务绑定。服务健康不保证任务已完成，仍按真实领取及成果核对，也不自动唤醒退出的 Codex。
 

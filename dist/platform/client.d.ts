@@ -10,12 +10,20 @@ export declare class AgentHubClient {
         run: HubRun;
         created: boolean;
     }>;
+    models(sessionId?: string): Promise<unknown>;
+    workspaces(): Promise<unknown>;
+    bindWorkspace(input: {
+        workspace: string;
+        sessionId?: string;
+        model?: string;
+        title?: string;
+    }): Promise<unknown>;
     get(id: string): Promise<HubRun>;
     events(id: string, after?: number): Promise<{
         events: HubEvent[];
     }>;
     cancel(id: string): Promise<HubRun>;
-    rework(id: string, feedback: string): Promise<HubRun>;
+    rework(id: string, feedback: string, model?: string): Promise<HubRun>;
     accept(id: string, note: string, evidence: string[]): Promise<HubRun>;
     wait(id: string, options?: {
         timeoutMs?: number;

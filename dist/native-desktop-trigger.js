@@ -5,7 +5,8 @@ import { DatabaseSync } from "node:sqlite";
 // The renderer forwards requests into the desktop's existing local daemon.
 // No UI controls, account tokens, CLI host or model are created by this code.
 export const RENDERER_BRIDGE = String.raw `(async function(){
-  if(globalThis.__codexNativeQueueBridgeV2) return true;
+  if(globalThis.__codexNativeQueueBridgeV2?.revision===3) return true;
+  globalThis.__codexNativeQueueBridgeV2?.close?.();
   const mc=new MessageChannel(), pending=new Map(), markers=new Map(), outgoing=new Map();
   let sequence=0, openResolve, closed=false;
   const opened=new Promise(resolve=>openResolve=resolve);
@@ -56,12 +57,40 @@ export const RENDERER_BRIDGE = String.raw `(async function(){
     await rpc('session:load',[sid,{cwd:session?.cwd,forceRendererHistoryReplay:true}]);
     return markers.get(sid)?.has(wakeId)===true;
   };
-  const wakeIdle=async(sid,wakeId,prompt)=>{
+  const listModels=async sid=>{
+    const product=await rpc('config:getProductConfiguration',[true],30000);
+    if(product?.remoteProductConfigurationStatus==='pending')throw Error('WorkBuddy model configuration is still loading; retry the query');
+    if(!Array.isArray(product?.models))throw Error('Incompatible native model list');
+    const allowed=Array.isArray(product.availableModels)?new Set(product.availableModels):null;
+    const models=product.models.filter(m=>m&&typeof m.id==='string'&&m.id.trim()&&(!allowed?.size||allowed.has(m.id)||allowed.has(m.id.replace(/^custom-local:/,'')))).map(m=>({id:m.id,name:m.name||m.id}));
+    const session=sid?await rpc('session:get',[sid]):undefined;
+    return {models,currentModel:session?.model||session?.config?.model,...sid?{sessionId:sid}:{}};
+  };
+  const applyModel=async(sid,model)=>{
+    const available=await listModels(sid);
+    if(!available.models.some(m=>m.id===model))throw Error('Model is not available in WorkBuddy: '+model);
+    if(available.currentModel!==model){
+      const result=await rpc('session:updateConfig',[sid,{model}],45000);
+      if(result?.error||result?.errorCode||result?.success===false)throw Error('Native model configuration was rejected');
+    }
+    const session=await rpc('session:get',[sid]);
+    const actual=session?.model||session?.config?.model;
+    if(actual!==model)throw Error('Native model change was not confirmed; inspect the session before retrying');
+    return {sessionId:sid,model:actual};
+  };
+  const setModel=async(sid,model)=>{
+    const state=await inspect(sid);
+    if(state.state!=='idle'||outgoing.has(sid))throw Error('Wait for the native WorkBuddy session to finish before changing its model');
+    outgoing.set(sid,{configuration:true});
+    try{return await applyModel(sid,model);}finally{outgoing.delete(sid);}
+  };
+  const wakeIdle=async(sid,wakeId,prompt,model)=>{
     if(markers.get(sid)?.has(wakeId))return {accepted:true,receipt:wakeId};
     const state=await inspect(sid);
     if(state.state!=='idle'||outgoing.has(sid))return {accepted:false};
     // Lock before sending. Native sendMessage has no independent busy rejection.
     const operation={wakeId,error:undefined};outgoing.set(sid,operation);
+    try{if(model)await applyModel(sid,model);}catch(error){outgoing.delete(sid);return {accepted:false,error:error.message};}
     const meta={'codebuddy.ai':{requestId:wakeId,userMessageId:wakeId,messageRequestId:wakeId,emitSyntheticUserPromptLive:true}};
     rpc('session:sendMessage',[sid,[{type:'text',text:prompt}],meta],0).then(()=>outgoing.delete(sid),error=>{operation.error=error.message;outgoing.delete(sid);});
     const deadline=Date.now()+8000;
@@ -80,7 +109,7 @@ export const RENDERER_BRIDGE = String.raw `(async function(){
     if(title)await rpc('session:rename',[sessionId,title]);
     return {sessionId:created.sessionId,workspace:created.cwd};
   };
-  globalThis.__codexNativeQueueBridgeV2={inspect,findWake,wakeIdle,createWorker};
+  globalThis.__codexNativeQueueBridgeV2={revision:3,inspect,findWake,wakeIdle,createWorker,listModels,setModel,close:()=>mc.port1.close()};
   return true;
 })()`;
 const DEFAULT_PROCESS_CONTROL = {
@@ -267,7 +296,13 @@ export class NativeDesktopRpcTrigger {
     }
     async call(method, args) {
         await this.connect();
-        return this.evaluateConnected(`globalThis.__codexNativeQueueBridgeV2.${method}(...${JSON.stringify(args)})`);
+        return this.evaluateConnected(`globalThis.__codexNativeQueueBridgeV2.${method}(...${JSON.stringify(args)})`, 90000);
+    }
+    async listModels(sessionId) {
+        return await this.call("listModels", [sessionId]);
+    }
+    async setModel(sessionId, model) {
+        return await this.call("setModel", [sessionId, model]);
     }
     async createWorker(workspace, sessionId, title) {
         if (!path.isAbsolute(workspace) || !fs.statSync(workspace).isDirectory())
@@ -286,10 +321,10 @@ export class NativeDesktopRpcTrigger {
         }
     }
     async findWake(sessionId, wakeId) { return await this.call("findWake", [sessionId, wakeId]) === true; }
-    async wakeIdle(sessionId, wakeId, prompt) {
+    async wakeIdle(sessionId, wakeId, prompt, model) {
         if (!/^wake-run-[a-f0-9-]{36}$/.test(wakeId) || !prompt.startsWith(`[CODEX_QUEUE_WAKE ${wakeId}]`))
             throw new Error("Wake identity must match its queue marker");
-        return await this.call("wakeIdle", [sessionId, wakeId, prompt]);
+        return await this.call("wakeIdle", [sessionId, wakeId, prompt, model]);
     }
     close() { this.socket?.close(); this.socket = undefined; }
 }

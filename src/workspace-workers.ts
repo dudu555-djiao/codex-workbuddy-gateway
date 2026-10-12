@@ -17,6 +17,7 @@ export interface WorkspaceWorker {
 }
 export interface NativeWorkerCreator {
   createWorker(workspace: string, sessionId: string, title?: string): Promise<{sessionId: string; workspace: string}>;
+  setModel?(sessionId: string, model: string): Promise<{sessionId:string;model:string}>;
 }
 type Row = Omit<WorkspaceWorker, "selected"> & { selected: number };
 function decode(row: Row): WorkspaceWorker {return {...row,selected:row.selected===1,error:row.error??undefined};}
@@ -84,16 +85,28 @@ export class WorkspaceWorkers {
     if(evidence.registered && evidence.cwd && path.resolve(evidence.cwd)!==worker.workspace)throw new Error("Native session workspace differs from the requested project");
     return evidence.registered && Boolean(evidence.cwd);
   }
-  async ensure(input: {workspace: string; sessionId?: string; title?: string}, native: NativeWorkerCreator): Promise<{created: boolean; worker: WorkspaceWorker}> {
+  async ensure(input: {workspace: string; sessionId?: string; title?: string; model?:string}, native: NativeWorkerCreator): Promise<{created: boolean; worker: WorkspaceWorker; model?:string}> {
     if(!path.isAbsolute(input.workspace)||!fs.statSync(input.workspace).isDirectory())throw new Error("workspace must be an existing absolute directory");
     const workspace = path.resolve(input.workspace);
+    const selectionBefore=this.selected(workspace)?.sessionId;
+    const checkSelection=()=>{
+      if(this.selected(workspace)?.sessionId!==selectionBefore)throw new Error('Workspace selection changed during model configuration; the newer binding was retained');
+    };
+    const configure=async(sessionId:string)=>{
+      if(!input.model)return;
+      if(!native.setModel)throw new Error("Native model selection is unavailable; update the complete gateway");
+      const actual=await native.setModel(sessionId,input.model);
+      if(actual.sessionId!==sessionId||actual.model!==input.model)throw new Error("Native model selection returned a different identity or model");
+    };
     if(input.sessionId) {
       if(!this.verify({workspace,sessionId:input.sessionId}))throw new Error("The chosen WorkBuddy session is not registered; supply a real existing session or omit sessionId for native creation");
-      return {created:false,worker:this.select(workspace,input.sessionId)};
+      await configure(input.sessionId);
+      checkSelection();
+      return {created:false,worker:this.select(workspace,input.sessionId),model:input.model};
     }
     const previous = this.selected(workspace);
     if(previous) {
-      if(this.verify(previous))return {created:false,worker:this.select(workspace,previous.sessionId)};
+      if(this.verify(previous)){await configure(previous.sessionId);checkSelection();return {created:false,worker:this.select(workspace,previous.sessionId),model:input.model};}
       throw new Error(previous.state==='ready' ? "The registered WorkBuddy session was deleted or is unavailable; select another real session explicitly" : "Native creation is in progress or uncertain; inspect the reserved session before retrying. No second session was created");
     }
     const worker = this.reserve(workspace);
@@ -105,7 +118,9 @@ export class WorkspaceWorkers {
       this.db.prepare("UPDATE workers SET state='ready',updatedAt=?,error=NULL WHERE sessionId=?").run(new Date().toISOString(),worker.sessionId);
       const selected=this.selected(workspace);
       if(selected?.sessionId!==worker.sessionId)throw new Error("Workspace selection changed while creating this session; its native record was retained without overriding the newer selection");
-      return {created:true,worker:selected};
+      await configure(worker.sessionId);
+      if(this.selected(workspace)?.sessionId!==worker.sessionId)throw new Error('Workspace selection changed during model configuration; the newer binding was retained');
+      return {created:true,worker:selected,model:input.model};
     } catch(error) {
       this.db.prepare("UPDATE workers SET state='uncertain',error=?,updatedAt=? WHERE sessionId=? AND state='creating'").run(error instanceof Error?error.message:String(error),new Date().toISOString(),worker.sessionId);
       throw error;

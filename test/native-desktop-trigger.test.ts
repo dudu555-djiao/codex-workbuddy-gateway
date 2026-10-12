@@ -13,10 +13,12 @@ type Envelope = { id: string; type: string; channel: string; args: unknown[]; re
 type Frame = { kind: string; json?: Envelope; text?: string };
 type RequestHandler = (request: Envelope, native: NativeFixture) => unknown | Promise<unknown>;
 type Bridge = {
+  listModels(sessionId?:string):Promise<{models:Array<{id:string;name:string}>;currentModel?:string}>;
+  setModel(sessionId:string,model:string):Promise<{sessionId:string;model:string}>;
   createWorker(workspace:string,sessionId:string,title?:string):Promise<{sessionId:string;workspace:string}>;
   inspect(sessionId: string): Promise<{ state: string; workspace?: string; [key: string]: unknown }>;
   findWake(sessionId: string, wakeId: string): Promise<boolean>;
-  wakeIdle(sessionId: string, wakeId: string, prompt: string): Promise<{ accepted: boolean; [key: string]: unknown }>;
+  wakeIdle(sessionId: string, wakeId: string, prompt: string, model?:string): Promise<{ accepted: boolean; [key: string]: unknown }>;
 };
 
 class FakePort {
@@ -91,6 +93,8 @@ class NativeFixture {
 
   defaultResponse(request: Envelope): unknown {
     switch (request.channel) {
+      case "config:getProductConfiguration": return {models:[{id:'fast',name:'Fast'},{id:'deep',name:'Deep'},{id:'hidden',name:'Hidden'},{id:'custom-local:own',name:'Own'}],availableModels:['fast','deep','own']};
+      case "session:updateConfig": this.session.model=(request.args[1] as {model:string}).model;return {config:{model:this.session.model}};
       case "session:get": return this.session;
       case "daemon:getActiveSessions": return this.active;
       case "session:load":
@@ -152,6 +156,32 @@ async function fixture(t: { after(callback: () => void): void }) {
   await native.ready;
   return native;
 }
+
+test('native model discovery filters unavailable models and switching verifies persisted selection without prompts',async t=>{
+  const f=await fixture(t);f.session.model='fast';
+  const available=await f.bridge.listModels(f.sessionId);
+  assert.equal(available.currentModel,'fast');assert.deepEqual(Array.from(available.models,m=>m.id),['fast','deep','custom-local:own']);
+  assert.equal((await f.bridge.setModel(f.sessionId,'deep')).model,'deep');assert.equal(f.session.model,'deep');assert.equal(f.sends().length,0);
+  await assert.rejects(()=>f.bridge.setModel(f.sessionId,'missing'),/not available/);assert.equal(f.session.model,'deep');
+  f.active=[{sessionId:f.sessionId}];await assert.rejects(()=>f.bridge.setModel(f.sessionId,'fast'),/finish/);assert.equal(f.session.model,'deep');
+});
+
+test('native model switch never reports success when configuration readback disagrees',async t=>{
+  const f=await fixture(t);f.session.model='fast';f.handler=r=>r.channel==='session:updateConfig'?{}:f.defaultResponse(r);
+  await assert.rejects(()=>f.bridge.setModel(f.sessionId,'deep'),/not confirmed/);assert.equal(f.sends().length,0);
+});
+
+test('invalid task model is rejected before sending any native prompt',async t=>{
+  const f=await fixture(t);const response=await f.bridge.wakeIdle(f.sessionId,WAKE_A,wakePrompt(WAKE_A),'missing');
+  assert.equal(response.accepted,false);assert.match(String(response.error),/not available/);assert.equal(f.sends().length,0);
+});
+
+test('wake switches model before dispatch and cannot overlap another configuration',async t=>{
+  const f=await fixture(t);f.session.model='fast';
+  f.handler=r=>{if(r.channel==='session:sendMessage'){assert.equal(f.session.model,'deep');f.userEvent(WAKE_A);}return f.defaultResponse(r);};
+  assert.equal((await f.bridge.wakeIdle(f.sessionId,WAKE_A,wakePrompt(WAKE_A),'deep')).accepted,true);
+  assert.equal(f.sends().length,1);assert.ok(f.requests.findIndex(r=>r.channel==='session:updateConfig')<f.requests.findIndex(r=>r.channel==='session:sendMessage'));
+});
 
 test("cold persisted session is busy when the native activity list has the pinned session", async (t) => {
   const f = await fixture(t);

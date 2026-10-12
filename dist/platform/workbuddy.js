@@ -4,13 +4,13 @@ import { TaskStore } from "../task-store.js";
 import { TaskCoordinator } from "../coordinator.js";
 import { WorkBuddyClient, messageText } from "../workbuddy-client.js";
 import { runsDirectory } from "../run-journal.js";
-import { workerRegistration } from "../workspace-manager.js";
+import { workerRegistration, listModels, listWorkspaces, ensureWorkspace } from "../workspace-manager.js";
 import { HubError } from "./contracts.js";
 export class WorkBuddyProvider {
     config;
     id = "workbuddy";
     label = "WorkBuddy";
-    capabilities = { outputs: ["text", "json", "artifacts"], execution: "native-desktop", sessionIsolation: "project", modelSelection: false, creditUsage: false, cancellation: "cooperative", fullToolTrace: false };
+    capabilities = { outputs: ["text", "json", "artifacts"], execution: "native-desktop", sessionIsolation: "project", modelSelection: true, workspaceBinding: true, creditUsage: false, cancellation: "cooperative", fullToolTrace: false };
     store;
     client;
     coordinator;
@@ -23,6 +23,9 @@ export class WorkBuddyProvider {
         this.coordinator = new TaskCoordinator(config, this.store, this.client);
     }
     close() { this.store.close(); }
+    models(sessionId) { return listModels(this.config, sessionId); }
+    workspaces() { return { ok: true, workers: listWorkspaces(this.config) }; }
+    bindWorkspace(input) { return ensureWorkspace(this.config, input); }
     async health() {
         let message = "First submitted workspace will be prepared automatically. WorkBuddy login and permissions must be valid.";
         let state = "needs_setup";
@@ -48,7 +51,7 @@ export class WorkBuddyProvider {
     async submit(run) {
         let response;
         try {
-            response = await this.coordinator.send({ taskId: run.providerTaskId, workspace: run.workspace, objective: this.instructions(run), constraints: run.input.constraints, timeoutSeconds: Math.max(1, Math.ceil((Date.parse(run.deadline) - Date.now()) / 1000)) });
+            response = await this.coordinator.send({ taskId: run.providerTaskId, workspace: run.workspace, sessionId: run.input.sessionId, model: run.input.model, objective: this.instructions(run), constraints: run.input.constraints, timeoutSeconds: Math.max(1, Math.ceil((Date.parse(run.deadline) - Date.now()) / 1000)) });
         }
         catch (error) {
             // The coordinator reserves TaskStore before it can submit a task. Native
@@ -76,7 +79,7 @@ export class WorkBuddyProvider {
             this.client.cancel(task.messageId);
     }
     async rework(run) {
-        const response = await this.coordinator.continue({ taskId: run.providerTaskId, feedback: `${run.feedback}\n\n${this.instructions(run)}`, timeoutSeconds: Math.max(1, Math.ceil((Date.parse(run.deadline) - Date.now()) / 1000)) });
+        const response = await this.coordinator.continue({ taskId: run.providerTaskId, model: run.input.model, feedback: `${run.feedback}\n\n${this.instructions(run)}`, timeoutSeconds: Math.max(1, Math.ceil((Date.parse(run.deadline) - Date.now()) / 1000)) });
         if (!response.ok)
             throw new Error(response.error ?? "WorkBuddy rework was blocked");
     }

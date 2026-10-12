@@ -19,16 +19,49 @@ class FakeTrigger implements NativeDesktopTrigger {
   accepted = true;
   found = false;
   inspections = 0;
-  wakes: Array<{ sessionId: string; wakeId: string; prompt: string }> = [];
+  wakes: Array<{ sessionId: string; wakeId: string; prompt: string; model?:string }> = [];
   beforeSubmit?: () => void | Promise<void>;
   async inspect() { this.inspections++; return { state: this.state, workspace: this.workspace }; }
-  async wakeIdle(sessionId: string, wakeId: string, prompt: string) {
-    this.wakes.push({ sessionId, wakeId, prompt });
+  async wakeIdle(sessionId: string, wakeId: string, prompt: string, model?:string) {
+    this.wakes.push({ sessionId, wakeId, prompt, model });
     await this.beforeSubmit?.();
     return { accepted: this.accepted, receipt: this.accepted ? "native-receipt" : undefined };
   }
   async findWake() { return this.found; }
 }
+
+test('explicit model tasks wait for verified native wake; later models cannot be claimed in the old turn',async t=>{
+  const f=fixture(t);
+  await f.coordinator.send({taskId:'model-one',objective:'fixture',workspace:f.dir,sessionId:'worker-session',model:'fast'});
+  assert.equal((await f.queue.claim('worker-session',0)).status,'retry');
+  assert.equal((await f.service().pump()).status,'wake_submitted');assert.equal(f.trigger.wakes[0]?.model,'fast');
+  const first=await f.queue.claim('worker-session',0);assert.equal(first.status,'task');if(first.status!=='task')throw Error('missing claim');
+  await f.coordinator.send({taskId:'model-two',objective:'fixture',workspace:f.dir,sessionId:'worker-session',model:'deep'});
+  f.queue.report({...first,status:'completed',text:'fixture completed',artifacts:[]});
+  assert.equal((await f.queue.claim('worker-session',0)).status,'retry');
+  assert.equal((await f.service().pump()).status,'wake_submitted');assert.equal(f.trigger.wakes[1]?.model,'deep');
+  assert.equal((await f.queue.claim('worker-session',0)).status,'task');
+});
+
+test('crash after model wake receipt reconciles claim permission without a second native prompt',async t=>{
+  const f=fixture(t);
+  await f.coordinator.send({taskId:'model-recovery',objective:'fixture',workspace:f.dir,sessionId:'worker-session',model:'fast'});
+  await f.service().pump();const journal=new RunJournal(f.config.runsDir!,f.store.get('model-recovery')!.attemptId!);
+  fs.rmSync(path.join(journal.dir,'model-ready.json'));
+  assert.equal((await f.queue.claim('worker-session',0)).status,'retry');
+  assert.equal((await f.service().pump()).status,'wake_pending');assert.equal(f.trigger.wakes.length,1);
+  assert.equal((await f.queue.claim('worker-session',0)).status,'task');
+});
+
+test('native model rejection blocks the task before any claim and permits a corrected round',async t=>{
+  const f=fixture(t);
+  await f.coordinator.send({taskId:'invalid-model',objective:'fixture',workspace:f.dir,sessionId:'worker-session',model:'bad'});
+  f.trigger.wakeIdle=async()=>({accepted:false,error:'Model unavailable'});
+  assert.equal((await f.service().pump()).status,'wake_rejected');
+  assert.equal((await f.coordinator.sync('invalid-model')).state,'blocked');
+  assert.equal((await f.queue.claim('worker-session',0)).status,'retry');
+  assert.equal((await f.coordinator.continue({taskId:'invalid-model',feedback:'use available model',model:'fast'})).ok,true);
+});
 
 function fixture(t: { after: (fn: () => void) => void }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "workbuddy-persistent-unit-"));

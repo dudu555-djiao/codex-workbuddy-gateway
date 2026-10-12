@@ -18,6 +18,9 @@ class FakeProvider implements AgentProvider {
   snapshots = new Map<string, ProviderSnapshot>(); submitted: HubRun[] = []; reworked: HubRun[] = []; cancelled: string[] = []; accepted: string[] = [];
   sendError?: Error;
   async health() { return { state: "available", message: "test fixture only", usage: { credits: null, source: "unavailable" } as const }; }
+  async models(sessionId?:string){return {models:[{id:'fast',name:'Fast'}],sessionId};}
+  workspaces(){return {workers:[]};}
+  async bindWorkspace(input:{workspace:string;sessionId?:string;model?:string}){return {ok:true,...input};}
   async submit(run: HubRun) { this.submitted.push(run); if (this.sendError) throw this.sendError; this.snapshots.set(run.id, { status: "queued", holdsCapacity: true, attemptId: `attempt-${run.round}`, sessionId: run.workspace, events: [] }); }
   async poll(run: HubRun) { return this.snapshots.get(run.id); }
   async cancel(run: HubRun) { this.cancelled.push(run.id); }
@@ -46,7 +49,9 @@ test("stable idempotency keys return original runs and reject changed requests, 
   finally { other.close(); }
   assert.equal(fs.statSync(first.run.workspace).isDirectory(), true);
   assert.throws(() => f.engine.submit({ task: "x", provider: "deepseek" }), /not implemented/);
-  assert.throws(() => f.engine.submit({ task: "x", model: "unsupported" }), /Unrecognized key/);
+  const configured=f.engine.submit({ task: "x", model: "chosen", sessionId: "native-session" }).run;
+  assert.equal(configured.input.model,"chosen");assert.equal(configured.input.sessionId,"native-session");
+  assert.throws(() => f.engine.submit({ task: "x", unexpected: true }), /Unrecognized key/);
 });
 
 test("global capacity and canonical per-project serial order allow other projects while one is occupied", async t => {
@@ -173,6 +178,10 @@ test("HTTP authentication, Host/Origin checks, SDK waiting, SSE reconnect, files
   });
   assert.equal(navigation, 200, "A normal clicked link may open the dashboard; API access stays same-origin");
   const page = await fetch(url); assert.match(page.headers.get("set-cookie")!, /HttpOnly; SameSite=Strict/); assert.match(await page.text(), /Agent Hub/);
+  assert.deepEqual(await client.models('native/session'),{models:[{id:'fast',name:'Fast'}],sessionId:'native/session'});
+  assert.deepEqual(await client.workspaces(),{workers:[]});
+  assert.deepEqual(await client.bindWorkspace({workspace:f.directory,sessionId:'native/session',model:'fast'}),{ok:true,workspace:f.directory,sessionId:'native/session',model:'fast'});
+  await assert.rejects(()=>client.bindWorkspace({workspace:f.directory,model:''}),/at least 1 character/);
   const { run } = await client.submit({ task: "http", output: "artifacts" });
   const queued = await client.request<HubRun>(`/v1/runs/${run.id}/wait?timeoutSeconds=1`); assert.equal(queued.status, "queued");
   const controller = new AbortController();

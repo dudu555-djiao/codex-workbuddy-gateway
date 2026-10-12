@@ -3,6 +3,8 @@ export declare const requestSchema: z.ZodObject<{
     provider: z.ZodDefault<z.ZodString>;
     task: z.ZodString;
     workspace: z.ZodOptional<z.ZodString>;
+    sessionId: z.ZodOptional<z.ZodString>;
+    model: z.ZodOptional<z.ZodString>;
     output: z.ZodDefault<z.ZodEnum<["text", "json", "artifacts"]>>;
     idempotencyKey: z.ZodOptional<z.ZodString>;
     constraints: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
@@ -13,12 +15,16 @@ export declare const requestSchema: z.ZodObject<{
     output: "text" | "artifacts" | "json";
     timeoutSeconds: number;
     provider: string;
+    sessionId?: string | undefined;
     workspace?: string | undefined;
+    model?: string | undefined;
     idempotencyKey?: string | undefined;
 }, {
     task: string;
+    sessionId?: string | undefined;
     constraints?: string[] | undefined;
     workspace?: string | undefined;
+    model?: string | undefined;
     output?: "text" | "artifacts" | "json" | undefined;
     timeoutSeconds?: number | undefined;
     provider?: string | undefined;
@@ -105,6 +111,14 @@ export interface AgentProvider {
         note: string;
         evidence: string[];
     }): Promise<void>;
+    models?(sessionId?: string): Promise<unknown>;
+    workspaces?(): unknown;
+    bindWorkspace?(input: {
+        workspace: string;
+        sessionId?: string;
+        model?: string;
+        title?: string;
+    }): Promise<unknown>;
 }
 export declare class HubError extends Error {
     readonly code: string;

@@ -97,6 +97,17 @@ async function main() {
     throw new Error(`Agent Hub service installed but not ready after 10 seconds; inspect ${path.join(directory, "stderr.log")}`);
   }
   const client = AgentHubClient.local(directory);
+  if(command==='models'||command==='workspaces'||command==='bind'){
+    let result:unknown;
+    if(command==='models')result=await client.models(process.argv[3]);
+    else if(command==='workspaces')result=await client.workspaces();
+    else {
+      const argument=process.argv[3];if(!argument)throw new Error('Usage: agent-hub bind @binding.json');
+      const input=JSON.parse(argument.startsWith('@')?fs.readFileSync(path.resolve(process.env.AGENT_HUB_CALLER_CWD??process.cwd(),argument.slice(1)),'utf8'):argument);
+      result=await client.bindWorkspace(input);
+    }
+    process.stdout.write(JSON.stringify(result,null,2)+'\n');return;
+  }
   if (command === "status") {
     const health = await client.request("/v1/health");
     process.stdout.write(JSON.stringify({ ...JSON.parse(fs.readFileSync(path.join(directory, "connection.json"), "utf8")), health }, null, 2) + "\n"); return;
@@ -115,6 +126,6 @@ async function main() {
     const id = process.argv[3]; if (!id) throw new Error(`Usage: agent-hub ${command} run-id`);
     process.stdout.write(JSON.stringify(await (command === "get" ? client.get(id) : client.cancel(id)), null, 2) + "\n"); return;
   }
-  throw new Error("Commands: serve, install, uninstall, status, run, get, cancel");
+  throw new Error("Commands: serve, install, uninstall, status, models, workspaces, bind, run, get, cancel");
 }
 main().catch(error => { process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`); process.exitCode = 1; });

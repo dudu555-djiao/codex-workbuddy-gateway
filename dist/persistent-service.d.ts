@@ -7,9 +7,10 @@ export interface NativeDesktopTrigger {
         workspace?: string;
         reason?: string;
     }>;
-    wakeIdle(sessionId: string, wakeId: string, prompt: string): Promise<{
+    wakeIdle(sessionId: string, wakeId: string, prompt: string, model?: string): Promise<{
         accepted: boolean;
         receipt?: string;
+        error?: string;
     }>;
     findWake?(sessionId: string, wakeId: string): Promise<boolean>;
 }

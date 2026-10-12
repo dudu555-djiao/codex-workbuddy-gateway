@@ -31,7 +31,7 @@ export declare class HubEngine {
     /** One serialized scheduler; start-up never replays dispatching records. */
     tick(): Promise<void>;
     cancel(id: string): Promise<HubRun>;
-    rework(id: string, feedback: string): Promise<HubRun>;
+    rework(id: string, feedback: string, model?: string): Promise<HubRun>;
     accept(id: string, input: {
         note: string;
         evidence: string[];

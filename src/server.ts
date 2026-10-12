@@ -12,7 +12,7 @@ import { resultForDetail, type ResultDetail, type BriefResultOptions } from "./b
 import { serviceStatus } from "./service-cli.js";
 import { readServiceRegistration } from "./persistent-service.js";
 import path from "node:path";
-import { ensureWorkspace, listWorkspaces } from "./workspace-manager.js";
+import { ensureWorkspace, listWorkspaces, listModels } from "./workspace-manager.js";
 
 const config = loadConfig();
 const client = new WorkBuddyClient(config);
@@ -40,8 +40,10 @@ server.tool("workbuddy_health", "Probe the configured transport. Online means a 
 }, detail));
 
 server.tool("workbuddy_ensure_workspace", "Create or reuse a dedicated native WorkBuddy session for a project directory without Computer Use or manual chat setup. Optional sessionId selects an existing real session in the same directory. Other projects and queued tasks retain their bindings.", {
-  workspace:z.string().min(1).describe("Existing absolute project directory"),sessionId:z.string().min(1).optional(),title:z.string().min(1).max(200).optional(),detail,
+  workspace:z.string().min(1).describe("Existing absolute project directory"),sessionId:z.string().min(1).optional(),title:z.string().min(1).max(200).optional(),model:z.string().trim().min(1).optional().describe("Optional exact native model ID. Changes require an idle session without queued tasks."),detail,
 }, ({detail,...input})=>guard(()=>ensureWorkspace(config,input),detail));
+
+server.tool("workbuddy_list_models", "Query models currently available in WorkBuddy, with optional session's selected model. Use returned IDs for model selection; availability does not prove quota or execution success.", {sessionId:z.string().min(1).optional(),detail}, ({sessionId,detail})=>guard(()=>listModels(config,sessionId),detail));
 
 server.tool("workbuddy_list_workspaces", "List registered project directories, selected execution sessions and native registration status. An installed worker does not prove task success.", {detail}, ({detail})=>guard(async()=>({ok:true,workers:listWorkspaces(config)}),detail));
 
@@ -51,7 +53,7 @@ server.tool("workbuddy_send_task", "Reserve and dispatch a task to a verified Wo
   taskId: taskId.optional(), objective: z.string().min(1), workspace: z.string().optional().describe("Existing absolute project directory; automatically create or reuse its native WorkBuddy worker when sessionId is omitted."),
   sessionId: z.string().min(1).optional().describe("Real WorkBuddy desktop session ID. Required when several live sessions exist."),
   sessionMode: z.enum(["existing", "new"]).optional().default("existing").describe("Queue uses project routing with existing; pass workspace for automatic native creation or selection. ACP new is version-dependent."),
-  model: z.string().min(1).optional().describe("ACP-only model selection. Queue uses the desktop-selected model and rejects remote model changes."),
+  model: z.string().trim().min(1).optional().describe("Exact model ID from workbuddy_list_models. Queue applies and verifies it at the next native wake; omit to use the session's selected model."),
   constraints: z.array(z.string()).max(30).optional(), acceptanceCommands: z.array(z.string()).max(30).optional(), timeoutSeconds: timeout,
   detail,
 }, ({ detail, ...input }) => guard(() => coordinator.send(input), detail));
